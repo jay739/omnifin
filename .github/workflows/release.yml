@@ -1,4 +1,4 @@
-name: Release desktop binaries
+name: Release server binaries (GoReleaser)
 
 on:
   push:
