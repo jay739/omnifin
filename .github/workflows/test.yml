@@ -1,10 +1,18 @@
-name: Test
+name: CI - build and test
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '.github/workflows/**'
+      - '**/*.md'
+      - 'docs/**'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '.github/workflows/**'
+      - '**/*.md'
+      - 'docs/**'
 
 # Principle of least privilege: this workflow only needs to read the repo to
 # build + test. No write access to issues, PRs, packages, deployments, etc.

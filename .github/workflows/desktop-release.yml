@@ -1,4 +1,4 @@
-name: Release desktop client (Tauri)
+name: Release desktop app (Tauri)
 
 on:
   push:

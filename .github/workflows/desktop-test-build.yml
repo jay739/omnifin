@@ -1,4 +1,4 @@
-name: Desktop test build (manual)
+name: Desktop app test build (manual)
 
 # A one-off Tauri build you can trigger manually from the Actions tab.
 # Builds for a single chosen platform and uploads the produced installer
