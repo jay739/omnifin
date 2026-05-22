@@ -1115,7 +1115,7 @@ export class accountsList extends PaginatedList implements Navigatable, AsTab {
 
     constructor() {
         super({
-            loader: document.getElementById("accounts-loader"),
+            loader: document.getElementById("accounts-table-loader"),
             loadMoreButtons: Array.from([
                 document.getElementById("accounts-load-more") as HTMLButtonElement,
             ]) as Array<HTMLButtonElement>,

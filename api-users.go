@@ -11,9 +11,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
+	"github.com/hrfee/mediabrowser"
 	"github.com/jay739/omnifin/common"
 	lm "github.com/jay739/omnifin/logmessages"
-	"github.com/hrfee/mediabrowser"
 	"github.com/lithammer/shortuuid/v3"
 	"github.com/timshannon/badgerhold/v4"
 )
@@ -36,7 +36,10 @@ func (app *appContext) NewUserFromAdmin(gc *gin.Context) {
 		gc.Abort()
 	}
 	var req newUserDTO
-	gc.BindJSON(&req)
+	if err := gc.ShouldBindJSON(&req); err != nil {
+		respondAPIError(400, "errorUnknown", "BAD_REQUEST", err.Error(), gc)
+		return
+	}
 
 	profile := app.storage.GetDefaultProfile()
 	if req.Profile != "" && req.Profile != "none" {
@@ -109,7 +112,10 @@ func (app *appContext) NewUserFromInvite(gc *gin.Context) {
 		  d) Email    (Require, Verify, ExistingUser) (only occurs here, PWRs are sent by mail so do this on their own, kinda)
 	*/
 	var req newUserDTO
-	gc.BindJSON(&req)
+	if err := gc.ShouldBindJSON(&req); err != nil {
+		respondAPIError(400, "errorUnknown", "BAD_REQUEST", err.Error(), gc)
+		return
+	}
 
 	// Validate CAPTCHA
 	if app.config.Section("captcha").Key("enabled").MustBool(false) && !app.verifyCaptcha(req.Code, req.CaptchaID, req.CaptchaText, false) {
@@ -399,7 +405,10 @@ func (app *appContext) PostNewUserFromInvite(nu NewUserData, req ConfirmationKey
 // @tags Users
 func (app *appContext) EnableDisableUsers(gc *gin.Context) {
 	var req enableDisableUserDTO
-	gc.BindJSON(&req)
+	if err := gc.ShouldBindJSON(&req); err != nil {
+		respondAPIError(400, "errorUnknown", "BAD_REQUEST", err.Error(), gc)
+		return
+	}
 	errors := errorListDTO{
 		"GetUser":   map[string]string{},
 		"SetPolicy": map[string]string{},
@@ -444,6 +453,17 @@ func (app *appContext) EnableDisableUsers(gc *gin.Context) {
 			Time:       time.Now(),
 		}, gc, false)
 
+		event := "user_disabled"
+		if req.Enabled {
+			event = "user_enabled"
+		}
+		app.fireWebhook(event, map[string]any{
+			"user_id":    user.ID,
+			"username":   user.Name,
+			"reason":     req.Reason,
+			"changed_by": gc.GetString("jfId"),
+		})
+
 		if sendMail && req.Notify {
 			if err := app.sendByID(msg, user.ID); err != nil {
 				app.err.Printf(lm.FailedSendEnableDisableMessage, user.ID, "?", err)
@@ -470,7 +490,10 @@ func (app *appContext) EnableDisableUsers(gc *gin.Context) {
 // @tags Users
 func (app *appContext) DeleteUsers(gc *gin.Context) {
 	var req deleteUserDTO
-	gc.BindJSON(&req)
+	if err := gc.ShouldBindJSON(&req); err != nil {
+		respondAPIError(400, "errorUnknown", "BAD_REQUEST", err.Error(), gc)
+		return
+	}
 	errors := map[string]string{}
 	sendMail := messagesEnabled
 	for _, userID := range req.Users {
@@ -509,6 +532,13 @@ func (app *appContext) DeleteUsers(gc *gin.Context) {
 				Value:      user.Name,
 				Time:       time.Now(),
 			}, gc, false)
+
+			app.fireWebhook("user_deleted", map[string]any{
+				"user_id":    userID,
+				"username":   user.Name,
+				"reason":     req.Reason,
+				"deleted_by": gc.GetString("jfId"),
+			})
 		}
 
 		// Contact details are stored separately and periodically removed,
@@ -712,7 +742,10 @@ func (app *appContext) DisableReferralForUsers(gc *gin.Context) {
 // @tags Users
 func (app *appContext) Announce(gc *gin.Context) {
 	var req announcementDTO
-	gc.BindJSON(&req)
+	if err := gc.ShouldBindJSON(&req); err != nil {
+		respondAPIError(400, "errorUnknown", "BAD_REQUEST", err.Error(), gc)
+		return
+	}
 	if !messagesEnabled {
 		respondAPIError(400, "errorMessagesDisabled", "MESSAGES_DISABLED", "", gc)
 		return
@@ -768,10 +801,10 @@ func (app *appContext) Announce(gc *gin.Context) {
 	}
 	app.info.Printf(lm.SentAnnouncementMessage, "*", "?")
 	app.fireWebhook("announcement_sent", map[string]any{
-		"subject":     req.Subject,
-		"recipients":  len(req.Users),
-		"test":        req.Test,
-		"sent_by":     gc.GetString("jfId"),
+		"subject":    req.Subject,
+		"recipients": len(req.Users),
+		"test":       req.Test,
+		"sent_by":    gc.GetString("jfId"),
 	})
 	respondBool(200, true, gc)
 }
