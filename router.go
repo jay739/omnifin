@@ -165,6 +165,8 @@ func (app *appContext) loadRoutes(router *gin.Engine) {
 	}()
 
 	for _, p := range routePrefixes {
+		router.GET(p+"/health", app.Health)
+		router.GET(p+"/ready", app.Ready)
 		router.GET(p+"/lang/:page", app.GetLanguages)
 		router.Use(serveTaggedStatic(p+"/", app.webFS))
 		router.GET(p+PAGES.Admin, app.AdminPage)
@@ -362,6 +364,51 @@ func (app *appContext) loadRoutes(router *gin.Engine) {
 			}
 		}
 	}
+}
+
+// Health reports liveness for process-level checks.
+func (app *appContext) Health(gc *gin.Context) {
+	gc.JSON(http.StatusOK, gin.H{
+		"status":  "ok",
+		"version": app.version,
+		"commit":  commit,
+	})
+}
+
+// Ready reports whether core dependencies are initialized.
+func (app *appContext) Ready(gc *gin.Context) {
+	ready := true
+	issues := []string{}
+
+	storageReady := app.storage != nil && app.storage.db != nil
+	if !storageReady {
+		ready = false
+		issues = append(issues, "storage_unavailable")
+	}
+
+	jellyfinReady := app.jf.MediaBrowser != nil && app.jf.Authenticated
+	if !jellyfinReady {
+		ready = false
+		issues = append(issues, "jellyfin_not_authenticated")
+	}
+
+	statusCode := http.StatusOK
+	status := "ready"
+	if !ready {
+		statusCode = http.StatusServiceUnavailable
+		status = "not_ready"
+	}
+
+	gc.JSON(statusCode, gin.H{
+		"status":  status,
+		"version": app.version,
+		"commit":  commit,
+		"checks": gin.H{
+			"storage":  storageReady,
+			"jellyfin": jellyfinReady,
+		},
+		"issues": issues,
+	})
 }
 
 func (app *appContext) loadSetup(router *gin.Engine) {
