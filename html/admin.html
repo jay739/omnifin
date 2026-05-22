@@ -867,14 +867,14 @@
                     </div>
                     <div id="accounts-table-details-container">
                         <div class="card @low accounts-details transition-opacity transition-display ui-hidden">
-                            <div id="accounts-loader"></div>
+                            <div id="accounts-details-loader"></div>
                         </div>
                         <div class="card @low accounts-header overflow-x-scroll transition-opacity transition-display" id="accounts-table">
                             <table class="table text-base leading-5">
                                 {{ template "accounts-table-header.txt" . }}
                                 <tbody id="accounts-list"></tbody>
                             </table>
-                            <div id="accounts-loader"></div>
+                            <div id="accounts-table-loader"></div>
                             <div class="ui-hidden h-[100%] my-3" id="accounts-not-found">
                                 <div class="flex flex-col gap-2 h-[100%] justify-center items-center">
                                     <span class="text-2xl font-medium italic text-center">{{ .strings.noResultsFound }}</span>

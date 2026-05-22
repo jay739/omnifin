@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hrfee/mediabrowser"
 	"github.com/jay739/omnifin/common"
 	"github.com/jay739/omnifin/jellyseerr"
 	"github.com/jay739/omnifin/logger"
-	"github.com/hrfee/mediabrowser"
 	"github.com/timshannon/badgerhold/v4"
 )
 
@@ -197,7 +197,7 @@ func (st *Storage) DebugWatch(storeType StoreType, key, mainData string) {
 
 func generateLogActions(c *Config) func(k string) DebugLogAction {
 	m := map[string]DebugLogAction{}
-	for _, v := range []string{"emails", "discord", "telegram", "matrix", "invites", "announcements", "expirires", "profiles", "custom_content"} {
+	for _, v := range []string{"emails", "discord", "telegram", "matrix", "invites", "announcements", "expiries", "profiles", "custom_content"} {
 		switch c.Section("advanced").Key("debug_log_" + v).MustString("none") {
 		case "none":
 			m[v] = NoLog
