@@ -144,6 +144,13 @@ A separate native desktop client is shipped alongside the server. It's **not** a
 
 On first launch it asks for your server URL (e.g. `https://omnifin.example.com` or `http://192.168.1.10:8056`), saves it locally, and from then on it opens straight to that server.
 
+#### Screenshots
+
+| Connect | Login | Dashboard |
+|:---:|:---:|:---:|
+| ![Desktop client — connect to server](images/01-omnifin-desktop-client-connect.png) | ![Desktop client — login](images/03-omnifin-desktop-client-login.png) | ![Desktop client — dashboard](images/02-omnifin-desktop-client-dashboard.png) |
+| Point the client at your Omnifin server | Sign in with your admin credentials | Manage users, invites, and announcements |
+
 **Native features:**
 - System tray icon (left-click → show, right-click → quick menu)
 - Native menu bar: Change Server URL (⌘,), Reload (⌘R), Find in Page (⌘F), Open in Default Browser (⌘⇧O), Zoom (⌘+/-/0), Quit (⌘Q)
