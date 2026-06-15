@@ -30,6 +30,7 @@
     window.emailEnabled = {{ .emailEnabled }};
     window.discordEnabled = {{ .discordEnabled }};
     window.telegramEnabled = {{ .telegramEnabled }};
+    window.watchStatsEnabled = {{ .watchStatsEnabled }};
     window.matrixEnabled = {{ .matrixEnabled }};
     window.notificationsEnabled = {{ .notifications }};
     window.ombiEnabled = {{ .ombiEnabled }};
