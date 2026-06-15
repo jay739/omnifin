@@ -1,6 +1,7 @@
 const express = require("express");
 const axios = require("axios");
 const { Pool } = require("pg");
+const rateLimit = require("express-rate-limit");
 const app = express();
 const PORT = 3020;
 
@@ -34,6 +35,17 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// Rate-limit all routes. The sidecar is internal-only, but a per-IP cap keeps
+// the Jellystat DB safe from request floods (and satisfies CodeQL).
+app.use(
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }),
+);
 
 function compactNumber(value) {
   const n = Number(value || 0);
