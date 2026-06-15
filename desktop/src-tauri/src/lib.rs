@@ -157,6 +157,67 @@ fn next_window_label() -> String {
     }
 }
 
+// Injected into every page (local and remote) before it loads. A heartbeat
+// that detects the wall-clock jump caused by the machine sleeping, then reloads
+// so the server page isn't left stale (expired session, dropped sockets) after
+// the system wakes. Cross-platform and dependency-free; Tauri exposes no
+// portable sleep/wake event, and a generous 30s gap avoids false reloads from
+// ordinary timer throttling.
+const WAKE_REFRESH_JS: &str = r#"
+(function () {
+  if (window.__omnifin_wake_installed) return;
+  window.__omnifin_wake_installed = true;
+  var INTERVAL = 10000; // tick every 10s
+  var GAP = 30000;      // a jump larger than this means the machine slept
+  var last = Date.now();
+  setInterval(function () {
+    var now = Date.now();
+    if (now - last > GAP) location.reload();
+    last = now;
+  }, INTERVAL);
+})();
+"#;
+
+// Injected before every page loads. Shows a branded "Loading Omnifin…" overlay
+// while a remote server page is fetching, removing the white flash between
+// Connect/launch/reload and the rendered page. Scoped to remote pages only —
+// the local setup and error pages (served from tauri.localhost) load instantly
+// and skip it. A 15s safety timeout guarantees the overlay never sticks.
+const LOADING_OVERLAY_JS: &str = r#"
+(function () {
+  if (location.protocol === "tauri:" || location.host === "tauri.localhost") return;
+  if (window.__omnifin_loader_installed) return;
+  window.__omnifin_loader_installed = true;
+  function build() {
+    if (document.getElementById("__omnifin_loader")) return;
+    var root = document.body || document.documentElement;
+    if (!root) return;
+    if (!document.getElementById("__omnifin_loader_style")) {
+      var style = document.createElement("style");
+      style.id = "__omnifin_loader_style";
+      style.textContent = "@keyframes __omnifin_spin{to{transform:rotate(360deg)}}";
+      (document.head || root).appendChild(style);
+    }
+    var o = document.createElement("div");
+    o.id = "__omnifin_loader";
+    o.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:#08080a;color:#f9fafb;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;transition:opacity .25s ease;";
+    o.innerHTML = "<div style=\"width:40px;height:40px;border:3px solid rgba(99,102,241,.25);border-top-color:#6366f1;border-radius:50%;animation:__omnifin_spin .8s linear infinite;\"></div><div style=\"font-size:14px;color:#9ca3af;\">Loading Omnifin…</div>";
+    root.appendChild(o);
+  }
+  function remove() {
+    var o = document.getElementById("__omnifin_loader");
+    if (!o) return;
+    o.style.opacity = "0";
+    setTimeout(function () { o.remove(); }, 260);
+  }
+  build();
+  document.addEventListener("readystatechange", build);
+  window.addEventListener("DOMContentLoaded", build);
+  window.addEventListener("load", remove);
+  setTimeout(remove, 15000);
+})();
+"#;
+
 // Build a fresh window pointed at the given target. Used on app launch,
 // "Change Server URL…", and "New Window".
 fn open_window_for(
@@ -170,6 +231,8 @@ fn open_window_for(
         .inner_size(1280.0, 800.0)
         .min_inner_size(720.0, 480.0)
         .center()
+        .initialization_script(WAKE_REFRESH_JS)
+        .initialization_script(LOADING_OVERLAY_JS)
         .build()
 }
 
