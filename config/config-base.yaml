@@ -1419,6 +1419,12 @@ sections:
     type: text
     depends_true: enabled
     description: API Key. Get this from the first tab in Jellyseerr's settings (NOT the "Jellyfin" tab!)
+  - setting: webhook_secret
+    name: Webhook Secret
+    requires_restart: true
+    type: text
+    depends_true: enabled
+    description: Secret for the inbound Jellyseerr webhook bridge. Point a Jellyseerr webhook at /jellyseerr/webhook/<secret> with the same value, and omnifin notifies the requesting user when their request is approved or available. Leave blank to disable.
   - setting: import_existing
     name: Import existing users to Jellyseerr
     requires_restart: true
