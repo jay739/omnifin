@@ -200,8 +200,8 @@ const LOADING_OVERLAY_JS: &str = r#"
     }
     var o = document.createElement("div");
     o.id = "__omnifin_loader";
-    o.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:#08080a;color:#f9fafb;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;transition:opacity .25s ease;";
-    o.innerHTML = "<div style=\"width:40px;height:40px;border:3px solid rgba(99,102,241,.25);border-top-color:#6366f1;border-radius:50%;animation:__omnifin_spin .8s linear infinite;\"></div><div style=\"font-size:14px;color:#9ca3af;\">Loading Omnifin…</div>";
+    o.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:#000000;color:#f9fafb;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;transition:opacity .25s ease;";
+    o.innerHTML = "<div style=\"width:40px;height:40px;border:3px solid rgba(245, 158, 11,.25);border-top-color:#f59e0b;border-radius:50%;animation:__omnifin_spin .8s linear infinite;\"></div><div style=\"font-size:14px;color:#9ca3af;\">Loading Omnifin…</div>";
     root.appendChild(o);
   }
   function remove() {
@@ -466,7 +466,7 @@ fn open_find_in_page(app: &AppHandle) {
     if (existing) { existing.querySelector('input').focus(); return; }
     var bar = document.createElement('div');
     bar.id = '__omnifin_find_bar';
-    bar.style.cssText = 'position:fixed;top:8px;right:8px;z-index:2147483647;background:#12121a;color:#f9fafb;border:1px solid #6366f1;border-radius:8px;padding:6px 8px;display:flex;gap:6px;align-items:center;font-family:-apple-system,sans-serif;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,0.4);';
+    bar.style.cssText = 'position:fixed;top:8px;right:8px;z-index:2147483647;background:#0a0a0a;color:#f9fafb;border:1px solid #f59e0b;border-radius:8px;padding:6px 8px;display:flex;gap:6px;align-items:center;font-family:-apple-system,sans-serif;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,0.4);';
     bar.innerHTML = '<input id="__omnifin_find_input" placeholder="Find on page" style="background:#1e1e28;color:#f9fafb;border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:4px 8px;width:220px;outline:none;font:inherit;"/><span id="__omnifin_find_count" style="opacity:0.6;min-width:40px;">0/0</span><button id="__omnifin_find_close" style="background:transparent;color:#9ca3af;border:0;cursor:pointer;font-size:16px;">×</button>';
     document.body.appendChild(bar);
     var input = bar.querySelector('input');

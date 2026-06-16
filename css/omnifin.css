@@ -579,7 +579,7 @@
 .dark .of-main .card:hover,
 .dark #user-cardlist .card:hover {
     box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(148, 163, 184, 0.06);
-    border-color: rgba(99, 102, 241, 0.3);
+    border-color: rgba(245, 158, 11, 0.3);
 }
 
 /* Inputs / textareas — focus glow */
