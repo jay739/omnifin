@@ -50,10 +50,10 @@
     width: 2rem;
     height: 2rem;
     border-radius: 0.5rem;
-    background-color: var(--primary);
-    color: #fff;
+    background: var(--primary-gradient);
+    color: #1c1917;
     font-size: 1.125rem;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
     flex-shrink: 0;
 }
 
@@ -108,8 +108,8 @@
 /* Active state — matches what TabManager adds */
 .of-nav-item.active,
 .of-nav-item.\~urge {
-    background-color: rgba(79, 70, 229, 0.1) !important;
-    color: var(--primary, #4f46e5) !important;
+    background-color: rgba(var(--primary-rgb), 0.1) !important;
+    color: var(--primary, #d97706) !important;
     font-weight: 600;
 }
 
@@ -286,7 +286,7 @@
 /* ── Override a17t active state so it doesn't fight our sidebar styling ── */
 .of-nav-item.active.\~urge,
 .of-nav-item.\~urge {
-    --color-fill: rgba(79, 70, 229, 0.1) !important;
+    --color-fill: rgba(var(--primary-rgb), 0.1) !important;
     --color-content: var(--primary) !important;
 }
 
@@ -298,10 +298,10 @@
     width: 3rem;
     height: 3rem;
     border-radius: 0.875rem;
-    background-color: var(--primary);
-    color: #fff;
+    background: var(--primary-gradient);
+    color: #1c1917;
     font-size: 1.5rem;
-    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.4);
+    box-shadow: 0 8px 24px rgba(var(--primary-rgb), 0.4);
 }
 
 /* ── Login modal visual upgrade ── */
@@ -311,7 +311,7 @@
 
 #modal-login .form-login {
     border: 1px solid var(--border-color, #1e293b);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(79, 70, 229, 0.08);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(var(--primary-rgb), 0.08);
 }
 
 #modal-login::before {
@@ -322,7 +322,7 @@
     transform: translateX(-50%);
     width: 28rem;
     height: 6rem;
-    background: radial-gradient(ellipse, rgba(79, 70, 229, 0.15) 0%, transparent 70%);
+    background: radial-gradient(ellipse, rgba(var(--primary-rgb), 0.15) 0%, transparent 70%);
     pointer-events: none;
     z-index: 0;
 }
@@ -390,7 +390,7 @@
     width: 3px;
     border-radius: 2px;
     background: var(--primary);
-    box-shadow: 0 0 8px rgba(79, 70, 229, 0.6);
+    box-shadow: 0 0 8px rgba(var(--primary-rgb), 0.6);
     animation: of-slide-in-left 0.2s ease-out;
 }
 
@@ -403,7 +403,7 @@
 .of-sidebar-logo-icon:hover,
 .of-login-logo-icon:hover {
     transform: scale(1.05) rotate(-3deg);
-    box-shadow: 0 12px 32px rgba(79, 70, 229, 0.5);
+    box-shadow: 0 12px 32px rgba(var(--primary-rgb), 0.5);
 }
 
 /* Buttons — subtle press + lift */
@@ -574,7 +574,7 @@
 #user-cardlist .card:hover {
     transform: translateY(-2px);
     box-shadow: 0 14px 32px rgba(15, 23, 42, 0.10), 0 1px 0 rgba(148, 163, 184, 0.10);
-    border-color: rgba(79, 70, 229, 0.18);
+    border-color: rgba(var(--primary-rgb), 0.18);
 }
 .dark .of-main .card:hover,
 .dark #user-cardlist .card:hover {
@@ -591,7 +591,7 @@ select {
 input.input:focus,
 textarea.textarea:focus,
 select:focus {
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
+    box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.18);
 }
 
 /* Chip pulse on hover */
@@ -643,7 +643,7 @@ select:focus {
 
 /* Loader/spinner soft glow */
 .loader, .loading {
-    filter: drop-shadow(0 0 6px rgba(79, 70, 229, 0.5));
+    filter: drop-shadow(0 0 6px rgba(var(--primary-rgb), 0.5));
 }
 
 /* Theme toggle button — rotate on click */
@@ -670,11 +670,11 @@ select:focus {
     justify-content: center;
     gap: 0.5rem;
     border-radius: 0.5rem;
-    border: 2px dashed var(--primary, #4f46e5);
-    background-color: rgba(79, 70, 229, 0.08);
+    border: 2px dashed var(--primary, #d97706);
+    background-color: rgba(var(--primary-rgb), 0.08);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
-    color: var(--primary, #4f46e5);
+    color: var(--primary, #d97706);
     font-weight: 600;
     text-align: center;
     pointer-events: none;
@@ -685,7 +685,7 @@ select:focus {
 }
 .of-dropzone.dragging textarea {
     border-color: var(--primary) !important;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
+    box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.18);
 }
 
 /* Reduced motion respect */
