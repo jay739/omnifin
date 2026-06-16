@@ -36,6 +36,7 @@ declare interface GlobalWindow extends Window {
     notificationsEnabled: boolean;
     emailEnabled: boolean;
     telegramEnabled: boolean;
+    watchStatsEnabled: boolean;
     discordEnabled: boolean;
     matrixEnabled: boolean;
     ombiEnabled: boolean;
