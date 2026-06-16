@@ -190,6 +190,11 @@ func (app *appContext) loadRoutes(router *gin.Engine) {
 		router.GET(p+"/token/login", rateLimitMiddleware(10, 60), app.getTokenLogin)
 		router.GET(p+"/token/refresh", rateLimitMiddleware(20, 60), app.getTokenRefresh)
 		router.POST(p+"/user/invite", rateLimitMiddleware(5, 60), app.NewUserFromInvite)
+		// Inbound Jellyseerr webhook bridge, authenticated by a secret in the
+		// path. Only registered when a secret is configured.
+		if app.config.Section("jellyseerr").Key("webhook_secret").String() != "" {
+			router.POST(p+"/jellyseerr/webhook/:secret", rateLimitMiddleware(20, 60), app.JellyseerrWebhook)
+		}
 		router.Use(serveTaggedStatic(p+PAGES.Form+"/", app.webFS))
 		router.GET(p+PAGES.Form+"/:invCode", app.InviteProxy)
 		if app.config.Section("captcha").Key("enabled").MustBool(false) {
