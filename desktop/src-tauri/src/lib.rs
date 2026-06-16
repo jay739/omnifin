@@ -1,10 +1,13 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::net::{TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Mutex;
+use std::time::Duration;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, State, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 
 // URL of the bundled setup page (the local index.html shipped inside the
@@ -15,6 +18,16 @@ const fn setup_page_url() -> &'static str {
         "http://tauri.localhost/index.html"
     } else {
         "tauri://localhost/index.html"
+    }
+}
+
+// URL of the bundled branded error page, shown when the configured server is
+// unreachable instead of the webview engine's default "can't connect" screen.
+const fn error_page_url() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "http://tauri.localhost/error.html"
+    } else {
+        "tauri://localhost/error.html"
     }
 }
 
@@ -64,6 +77,71 @@ fn remember_recent(cfg: &mut AppConfig, url: &str) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+//  Server reachability + connect-error state
+// ──────────────────────────────────────────────────────────────────────────
+
+// Details of the last failed connection, surfaced to error.html via the
+// get_connect_error command. Kept in memory only (transient, per-run).
+#[derive(Serialize, Clone)]
+struct ConnectErrorInfo {
+    url: String,
+    reason: String,
+}
+
+#[derive(Default)]
+struct ConnectErrorState(Mutex<Option<ConnectErrorInfo>>);
+
+fn store_connect_error(app: &AppHandle, url: String, reason: String) {
+    if let Some(state) = app.try_state::<ConnectErrorState>() {
+        if let Ok(mut guard) = state.0.lock() {
+            *guard = Some(ConnectErrorInfo { url, reason });
+        }
+    }
+}
+
+// Pre-flight reachability check: a plain TCP connect to host:port with a short
+// timeout. Catches exactly the "can't connect" cases the browser error covers
+// (DNS failure, connection refused, host down). std-only, no HTTP client dep.
+fn server_reachable(url: &Url) -> Result<(), String> {
+    let host = url.host_str().ok_or("URL has no host")?;
+    let port = url
+        .port_or_known_default()
+        .ok_or("URL has no port and no known default")?;
+    let addrs = (host, port)
+        .to_socket_addrs()
+        .map_err(|e| format!("could not resolve {}: {}", host, e))?;
+    let timeout = Duration::from_secs(3);
+    let mut last_err = String::from("no addresses resolved");
+    for addr in addrs {
+        match TcpStream::connect_timeout(&addr, timeout) {
+            Ok(_) => return Ok(()),
+            Err(e) => last_err = e.to_string(),
+        }
+    }
+    Err(last_err)
+}
+
+// Probe the server, then either navigate the window to it or to the branded
+// local error page (storing the failure for error.html to read). Used by the
+// recent-server menu pick and the Retry action.
+fn connect_or_show_error(app: &AppHandle, win: &WebviewWindow, parsed: Url) {
+    match server_reachable(&parsed) {
+        Ok(()) => {
+            let host = parsed.host_str().unwrap_or("").to_string();
+            let _ = win.set_title(&format!("Omnifin — {}", host));
+            let _ = win.navigate(parsed);
+        }
+        Err(reason) => {
+            store_connect_error(app, parsed.to_string(), reason);
+            let _ = win.set_title("Omnifin — Can't connect");
+            if let Ok(err_url) = Url::parse(error_page_url()) {
+                let _ = win.navigate(err_url);
+            }
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 //  Window management
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -79,17 +157,14 @@ fn next_window_label() -> String {
     }
 }
 
-// Build a fresh window pointed at either the saved URL or the bundled setup
-// page. Used on app launch, "Change Server URL…", and "New Window".
-fn open_window_for(app: &AppHandle, label: String, url: Option<Url>) -> tauri::Result<WebviewWindow> {
-    let title = match url.as_ref() {
-        Some(u) => format!("Omnifin — {}", u.host_str().unwrap_or("")),
-        None => "Omnifin — Connect".to_string(),
-    };
-    let target = match url {
-        Some(u) => WebviewUrl::External(u),
-        None => WebviewUrl::App("index.html".into()),
-    };
+// Build a fresh window pointed at the given target. Used on app launch,
+// "Change Server URL…", and "New Window".
+fn open_window_for(
+    app: &AppHandle,
+    label: String,
+    target: WebviewUrl,
+    title: String,
+) -> tauri::Result<WebviewWindow> {
     WebviewWindowBuilder::new(app, &label, target)
         .title(title)
         .inner_size(1280.0, 800.0)
@@ -98,11 +173,37 @@ fn open_window_for(app: &AppHandle, label: String, url: Option<Url>) -> tauri::R
         .build()
 }
 
-// Open the main launch window — saved URL if any, else setup form.
+// Target + title for the bundled setup (Connect) page — the default when no
+// server is saved or a fresh window is requested.
+fn setup_target() -> (WebviewUrl, String) {
+    (
+        WebviewUrl::App("index.html".into()),
+        "Omnifin — Connect".to_string(),
+    )
+}
+
+// Open the main launch window. If a server is saved, probe it first: navigate
+// to it when reachable, else open straight to the branded error page so the
+// user never sees the webview's default "can't connect" screen.
 fn open_main_window(app: &AppHandle) -> tauri::Result<()> {
     let cfg = load_config(app);
-    let url = cfg.server_url.as_deref().and_then(|s| Url::parse(s).ok());
-    open_window_for(app, "main".to_string(), url)?;
+    let (target, title) = match cfg.server_url.as_deref().and_then(|s| Url::parse(s).ok()) {
+        Some(url) => match server_reachable(&url) {
+            Ok(()) => (
+                WebviewUrl::External(url.clone()),
+                format!("Omnifin — {}", url.host_str().unwrap_or("")),
+            ),
+            Err(reason) => {
+                store_connect_error(app, url.to_string(), reason);
+                (
+                    WebviewUrl::App("error.html".into()),
+                    "Omnifin — Can't connect".to_string(),
+                )
+            }
+        },
+        None => setup_target(),
+    };
+    open_window_for(app, "main".to_string(), target, title)?;
     Ok(())
 }
 
@@ -122,7 +223,8 @@ fn open_setup_window(app: &AppHandle) -> tauri::Result<()> {
     }
     // Only fall through to creating a fresh window if none currently exists
     // (first launch with no saved URL, or after every window was closed).
-    open_window_for(app, "main".to_string(), None)?;
+    let (target, title) = setup_target();
+    open_window_for(app, "main".to_string(), target, title)?;
     Ok(())
 }
 
@@ -130,7 +232,8 @@ fn open_setup_window(app: &AppHandle) -> tauri::Result<()> {
 // alongside the current one.
 fn open_new_window(app: &AppHandle) -> tauri::Result<()> {
     let label = next_window_label();
-    open_window_for(app, label, None)?;
+    let (target, title) = setup_target();
+    open_window_for(app, label, target, title)?;
     Ok(())
 }
 
@@ -162,6 +265,17 @@ fn set_server_url(app: AppHandle, url: String) -> Result<(), String> {
             parsed.scheme()
         ));
     }
+    // Probe before saving: returning Err here lets the setup form show its
+    // inline error and keep the user's typed URL, and avoids persisting an
+    // unreachable server as the default.
+    server_reachable(&parsed).map_err(|e| {
+        format!(
+            "Couldn't reach {}: {}",
+            parsed.host_str().unwrap_or(trimmed.as_str()),
+            e
+        )
+    })?;
+
     let mut cfg = load_config(&app);
     cfg.server_url = Some(trimmed.clone());
     remember_recent(&mut cfg, &trimmed);
@@ -198,6 +312,40 @@ fn clear_server_url(app: AppHandle) -> Result<(), String> {
     cfg.server_url = None;
     save_config(&app, &cfg)?;
     open_setup_window(&app).map_err(|e| e.to_string())
+}
+
+// Read the last connection failure so the error page can show which server
+// failed and why. Returns None if there is no recorded error.
+#[tauri::command]
+fn get_connect_error(state: State<'_, ConnectErrorState>) -> Option<ConnectErrorInfo> {
+    state.0.lock().ok().and_then(|guard| guard.clone())
+}
+
+// Retry connecting to the saved server (called by the error page's Retry
+// button). Re-probes and either loads the server or re-shows the error page.
+#[tauri::command]
+fn retry_connect(app: AppHandle) -> Result<(), String> {
+    let saved = load_config(&app)
+        .server_url
+        .ok_or("no server configured to retry")?;
+    let parsed = Url::parse(&saved).map_err(|e| format!("invalid saved URL: {}", e))?;
+    let win = focused_window(&app).ok_or("no window to navigate")?;
+    connect_or_show_error(&app, &win, parsed);
+    Ok(())
+}
+
+// Open the setup form (keeps the saved URL so the form pre-fills) — used by
+// the error page's "Change server" action.
+#[tauri::command]
+fn open_setup(app: AppHandle) -> Result<(), String> {
+    open_setup_window(&app).map_err(|e| e.to_string())
+}
+
+// Open the current/failed server URL in the user's default browser — used by
+// the error page so they can sanity-check the server outside the app.
+#[tauri::command]
+fn open_current_in_browser(app: AppHandle) {
+    open_in_browser(&app);
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -428,11 +576,21 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
         other if other.starts_with("recent_") => {
             if let Some(idx) = other.strip_prefix("recent_").and_then(|s| s.parse::<usize>().ok())
             {
-                let cfg = load_config(app);
+                let mut cfg = load_config(app);
                 if let Some(url) = cfg.recent_servers.get(idx).cloned() {
-                    let _ = set_server_url(app.clone(), url);
-                    // Rebuild the menu so the picked server moves to the top.
-                    let _ = build_menu(app);
+                    if let Ok(parsed) = Url::parse(&url) {
+                        // Make this the active server and move it to the top of
+                        // history, then connect — showing the branded error
+                        // page (not silence) if the server is unreachable.
+                        cfg.server_url = Some(url.clone());
+                        remember_recent(&mut cfg, &url);
+                        let _ = save_config(app, &cfg);
+                        if let Some(win) = focused_window(app) {
+                            connect_or_show_error(app, &win, parsed);
+                        }
+                        // Rebuild the menu so the picked server moves to the top.
+                        let _ = build_menu(app);
+                    }
                 }
             }
         }
@@ -458,9 +616,14 @@ pub fn run() {
             set_server_url,
             get_server_url,
             get_recent_servers,
-            clear_server_url
+            clear_server_url,
+            get_connect_error,
+            retry_connect,
+            open_setup,
+            open_current_in_browser
         ])
         .setup(|app| {
+            app.manage(ConnectErrorState::default());
             let handle = app.handle().clone();
             build_menu(&handle)?;
             app.on_menu_event(move |app, event| handle_menu_event(app, event.id().as_ref()));

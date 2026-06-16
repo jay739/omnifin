@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Omnifin — Can't connect</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #08080a;
+        color: #f9fafb;
+      }
+      .wrap {
+        min-height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px;
+      }
+      .card {
+        max-width: 480px;
+        width: 100%;
+        background: #12121a;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 16px;
+        padding: 32px 28px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      }
+      .badge {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(239, 68, 68, 0.12);
+        color: #fca5a5;
+        margin-bottom: 16px;
+      }
+      .badge svg {
+        width: 24px;
+        height: 24px;
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      .sub {
+        color: #9ca3af;
+        font-size: 14px;
+        margin: 0 0 20px;
+        line-height: 1.55;
+      }
+      .detail {
+        font-size: 13px;
+        color: #fca5a5;
+        background: rgba(239, 68, 68, 0.08);
+        border-left: 3px solid rgba(239, 68, 68, 0.6);
+        padding: 10px 12px;
+        border-radius: 6px;
+        word-break: break-all;
+        line-height: 1.5;
+      }
+      .detail .url {
+        color: #f9fafb;
+        font-weight: 600;
+      }
+      .detail .reason {
+        display: block;
+        margin-top: 4px;
+        color: #fca5a5;
+        opacity: 0.85;
+      }
+      button {
+        width: 100%;
+        margin-top: 20px;
+        padding: 11px 16px;
+        background: #6366f1;
+        color: #fff;
+        border: 0;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      button:hover {
+        background: #4f46e5;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .actions button {
+        margin-top: 0;
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #c7c9d1;
+        font-weight: 500;
+      }
+      .actions button:hover {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+      .foot {
+        margin-top: 22px;
+        text-align: center;
+        font-size: 11px;
+        color: #4b5563;
+      }
+      .foot a {
+        color: #6b7280;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="badge" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+            />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+        </div>
+        <h1>Can't reach your Omnifin server</h1>
+        <p class="sub">
+          The app couldn't connect to your configured server. It may be offline,
+          restarting, or unreachable from this network.
+        </p>
+        <div class="detail">
+          <span class="url" id="url">your Omnifin server</span>
+          <span class="reason" id="reason"></span>
+        </div>
+        <button id="retry" type="button">Retry</button>
+        <div class="actions">
+          <button id="change" type="button">Change server</button>
+          <button id="browser" type="button">Open in browser</button>
+        </div>
+        <p class="foot">
+          Still stuck?
+          <a href="https://github.com/jay739/omnifin" target="_blank"
+            >github.com/jay739/omnifin</a
+          >
+        </p>
+      </div>
+    </div>
+    <script>
+      const urlEl = document.getElementById("url");
+      const reasonEl = document.getElementById("reason");
+      const retryBtn = document.getElementById("retry");
+      const changeBtn = document.getElementById("change");
+      const browserBtn = document.getElementById("browser");
+
+      // Tauri 2.x exposes its API at window.__TAURI__.core only when
+      // app.withGlobalTauri is true. Guard so a missing bridge degrades
+      // gracefully (page still renders) instead of throwing.
+      function getInvoke() {
+        const t = window.__TAURI__;
+        if (!t || !t.core || typeof t.core.invoke !== "function") {
+          throw new Error("Tauri IPC not available");
+        }
+        return t.core.invoke;
+      }
+
+      // Populate the failed URL + reason recorded by the Rust side.
+      (async () => {
+        try {
+          const invoke = getInvoke();
+          const info = await invoke("get_connect_error");
+          if (info && info.url) urlEl.textContent = info.url;
+          if (info && info.reason) reasonEl.textContent = info.reason;
+        } catch (_) {
+          /* outside Tauri or no error recorded — leave the defaults */
+        }
+      })();
+
+      retryBtn.addEventListener("click", async () => {
+        retryBtn.disabled = true;
+        retryBtn.textContent = "Retrying…";
+        try {
+          const invoke = getInvoke();
+          // On success Rust navigates this window to the server; if the server
+          // is still down it re-navigates here, reloading the page. Either way
+          // the button state is replaced, so we only reset it on error.
+          await invoke("retry_connect");
+        } catch (e) {
+          reasonEl.textContent = String(e?.message || e);
+          retryBtn.disabled = false;
+          retryBtn.textContent = "Retry";
+        }
+      });
+
+      changeBtn.addEventListener("click", async () => {
+        try {
+          getInvoke()("open_setup");
+        } catch (_) {}
+      });
+
+      browserBtn.addEventListener("click", async () => {
+        try {
+          getInvoke()("open_current_in_browser");
+        } catch (_) {}
+      });
+    </script>
+  </body>
+</html>
