@@ -10,6 +10,35 @@ import {
     toClipboard,
     formatApiFailure,
 } from "../modules/common";
+
+// Per-user watch-time in seconds, keyed by Jellyfin username, fetched once from
+// /users/watch-time (backed by the jellyfin-stats-api sidecar). Account rows
+// read it when their name is set, so it stays out of the cached user DTOs.
+let watchTimeMap: { [username: string]: number } = {};
+
+const formatWatchTime = (seconds: number): string => {
+    const totalMinutes = Math.max(0, Math.round((seconds || 0) / 60));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
+    if (hours > 0) return `${hours}h`;
+    return `${minutes}m`;
+};
+
+// Fetch the watch-time map, then trigger one reload so already-rendered rows
+// pick it up. Not bound to accounts-reload itself, to avoid a fetch loop.
+const refreshWatchTimeMap = () => {
+    if (!window.watchStatsEnabled) return;
+    _get("/users/watch-time", null, (req: XMLHttpRequest) => {
+        if (req.readyState != 4 || req.status != 200) return;
+        watchTimeMap = (req.response && req.response["watch_time"]) || {};
+        document.dispatchEvent(new CustomEvent("accounts-reload"));
+    });
+};
+
+if (window.watchStatsEnabled) {
+    document.addEventListener("DOMContentLoaded", refreshWatchTimeMap);
+}
 import { templateEmail } from "../modules/settings";
 import { Marked } from "@ts-stack/markdown";
 import { stripMarkdown } from "../modules/stripmd";
@@ -213,6 +242,7 @@ class User extends TableRow implements UserDTO, SearchableItem {
     private _expiryUnix: number;
     private _lastActive: HTMLTableDataCellElement;
     private _lastActiveUnix: number;
+    private _watchTime: HTMLTableDataCellElement;
     private _notifyDropdown: HTMLDivElement;
     private _label: HTMLInputElement;
     private _labelEditor: HiddenInputField;
@@ -266,6 +296,10 @@ class User extends TableRow implements UserDTO, SearchableItem {
     }
     set name(value: string) {
         this._username.textContent = value;
+        if (this._watchTime) {
+            const secs = watchTimeMap[value] || 0;
+            this._watchTime.textContent = secs > 0 ? formatWatchTime(secs) : "";
+        }
     }
 
     get admin(): boolean {
@@ -754,6 +788,11 @@ class User extends TableRow implements UserDTO, SearchableItem {
         <td class="accounts-expiry"></td>
         <td class="accounts-last-active whitespace-nowrap"></td>
         `;
+        if (window.watchStatsEnabled) {
+            innerHTML += `
+        <td class="accounts-watch-time whitespace-nowrap"></td>
+        `;
+        }
         this._row.innerHTML = innerHTML;
         this._check = this._row.querySelector("input[type=checkbox].accounts-select-user") as HTMLInputElement;
         this._accounts_admin = this._row.querySelector("input[type=checkbox].accounts-access-jfa") as HTMLInputElement;
@@ -782,6 +821,9 @@ class User extends TableRow implements UserDTO, SearchableItem {
         this._matrix = this._row.querySelector(".accounts-matrix") as HTMLTableDataCellElement;
         this._expiry = this._row.querySelector(".accounts-expiry") as HTMLTableDataCellElement;
         this._lastActive = this._row.querySelector(".accounts-last-active") as HTMLTableDataCellElement;
+        if (window.watchStatsEnabled) {
+            this._watchTime = this._row.querySelector(".accounts-watch-time") as HTMLTableDataCellElement;
+        }
         this._label = this._row.querySelector(".accounts-label-container") as HTMLInputElement;
         this._labelEditor = new HiddenInputField({
             container: this._label,

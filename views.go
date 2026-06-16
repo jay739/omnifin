@@ -120,6 +120,7 @@ func (app *appContext) BasePageTemplateValues(gc *gin.Context, lang string, page
 	set("matrixEnabled", matrixEnabled)
 	set("ombiEnabled", ombiEnabled)
 	set("jellyseerrEnabled", jellyseerrEnabled)
+	set("watchStatsEnabled", watchStatsEnabled())
 	// QUIRK: The login modal html template uses this' existence to check if the modal is for the admin or user page.
 	if page != AdminPage {
 		set("pwrEnabled", app.config.Section("password_resets").Key("enabled").MustBool(false))
