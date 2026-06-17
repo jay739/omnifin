@@ -469,15 +469,18 @@ export function bindManualDropdowns() {
 
 /** Builds a user-visible message from JSON API errors ({ error, hint, code }) or falls back. */
 export function formatApiFailure(req: XMLHttpRequest, fallback: string): string {
+    // Append the HTTP status to opaque failures so a generic message is never
+    // a dead end (e.g. a rotated-token 401 reads as "... (HTTP 401)").
+    const withStatus = (m: string) => (req.status > 0 ? `${m} (HTTP ${req.status})` : m);
     if (req.status === 0) {
         return fallback;
     }
     const r = req.response as { error?: string | boolean; hint?: string; code?: string } | null;
     if (!r || typeof r !== "object") {
-        return fallback;
+        return withStatus(fallback);
     }
     if (r.error === true) {
-        return fallback;
+        return withStatus(fallback);
     }
     const msgKey = typeof r.error === "string" ? r.error : "";
     if (msgKey) {
@@ -497,7 +500,7 @@ export function formatApiFailure(req: XMLHttpRequest, fallback: string): string 
     if (typeof r.hint === "string" && r.hint.trim()) {
         return fallback + " — " + r.hint;
     }
-    return fallback;
+    return withStatus(fallback);
 }
 
 export function unicodeB64Decode(s: string): string {
