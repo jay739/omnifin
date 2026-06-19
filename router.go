@@ -280,6 +280,7 @@ func (app *appContext) loadRoutes(router *gin.Engine) {
 		api.GET(p+"/users/announce-files", app.GetAnnounceFiles)
 		api.GET(p+"/users/announce-files/:name", app.GetAnnounceFile)
 		api.GET(p+"/users/announce-vars", app.GetAnnounceVars)
+		api.GET(p+"/users/watch-time", app.GetUserWatchTime)
 		api.GET(p+"/users/announce/:name", app.GetAnnounceTemplate)
 		api.DELETE(p+"/users/announce/:name", app.DeleteAnnounceTemplate)
 

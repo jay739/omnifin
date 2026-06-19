@@ -20,5 +20,8 @@
         {{ end }}
         <th class="grid gap-4 place-items-stretch accounts-header-expiry">{{ .strings.expiry }}</th>
         <th class="grid gap-4 place-items-stretch accounts-header-last-active">{{ .strings.lastActiveTime }}</th>
+        {{ if .watchStatsEnabled }}
+        <th class="grid gap-4 place-items-stretch accounts-header-watchtime">Watch time</th>
+        {{ end }}
     </tr>
 </thead>

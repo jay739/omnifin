@@ -413,11 +413,17 @@ func start(asDaemon, firstCall bool) {
 		// copy it to app.patchedConfig, and patch in settings from app.config, and language stuff.
 		app.PatchConfigBase()
 
-		secret, err := generateSecret(16)
-		if err != nil {
-			app.err.Fatal(err)
+		// Only generate a JWT secret if one wasn't provided. A randomly
+		// regenerated secret on every start invalidates all existing tokens,
+		// logging everyone out on every restart/redeploy. Set JFA_SECRET in
+		// the environment to keep sessions stable across restarts.
+		if os.Getenv("JFA_SECRET") == "" {
+			secret, err := generateSecret(16)
+			if err != nil {
+				app.err.Fatal(err)
+			}
+			os.Setenv("JFA_SECRET", secret)
 		}
-		os.Setenv("JFA_SECRET", secret)
 
 		// Initialize jellyfin/emby connection
 		server := app.config.Section("jellyfin").Key("server").String()
