@@ -25,19 +25,37 @@ const formatWatchTime = (seconds: number): string => {
     return `${minutes}m`;
 };
 
-// Fetch the watch-time map, then trigger one reload so already-rendered rows
-// pick it up. Not bound to accounts-reload itself, to avoid a fetch loop.
+// Fill the rendered watch-time cells from the current map, matching each row by
+// its username. Safe to call repeatedly (initial load, reloads, pagination).
+const applyWatchTimes = () => {
+    document.querySelectorAll(".accounts-watch-time").forEach((cell) => {
+        const tr = (cell as HTMLElement).closest("tr");
+        const nameEl = tr ? tr.querySelector(".accounts-username") : null;
+        const name = nameEl ? nameEl.textContent || "" : "";
+        const secs = watchTimeMap[name] || 0;
+        (cell as HTMLElement).textContent = secs > 0 ? formatWatchTime(secs) : "";
+    });
+};
+
+// Fetch the watch-time map once the auth token exists (the accounts page sets
+// window.token after load, so fetching on DOMContentLoaded would 401), then
+// paint the cells. We do not re-dispatch accounts-reload, to avoid a loop.
 const refreshWatchTimeMap = () => {
     if (!window.watchStatsEnabled) return;
+    if (!window.token) {
+        window.setTimeout(refreshWatchTimeMap, 500);
+        return;
+    }
     _get("/users/watch-time", null, (req: XMLHttpRequest) => {
         if (req.readyState != 4 || req.status != 200) return;
         watchTimeMap = (req.response && req.response["watch_time"]) || {};
-        document.dispatchEvent(new CustomEvent("accounts-reload"));
+        applyWatchTimes();
     });
 };
 
 if (window.watchStatsEnabled) {
     document.addEventListener("DOMContentLoaded", refreshWatchTimeMap);
+    document.addEventListener("accounts-reload", applyWatchTimes);
 }
 import { templateEmail } from "../modules/settings";
 import { Marked } from "@ts-stack/markdown";

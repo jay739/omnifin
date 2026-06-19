@@ -157,6 +157,67 @@ fn next_window_label() -> String {
     }
 }
 
+// Injected into every page (local and remote) before it loads. A heartbeat
+// that detects the wall-clock jump caused by the machine sleeping, then reloads
+// so the server page isn't left stale (expired session, dropped sockets) after
+// the system wakes. Cross-platform and dependency-free; Tauri exposes no
+// portable sleep/wake event, and a generous 30s gap avoids false reloads from
+// ordinary timer throttling.
+const WAKE_REFRESH_JS: &str = r#"
+(function () {
+  if (window.__omnifin_wake_installed) return;
+  window.__omnifin_wake_installed = true;
+  var INTERVAL = 10000; // tick every 10s
+  var GAP = 30000;      // a jump larger than this means the machine slept
+  var last = Date.now();
+  setInterval(function () {
+    var now = Date.now();
+    if (now - last > GAP) location.reload();
+    last = now;
+  }, INTERVAL);
+})();
+"#;
+
+// Injected before every page loads. Shows a branded "Loading Omnifin…" overlay
+// while a remote server page is fetching, removing the white flash between
+// Connect/launch/reload and the rendered page. Scoped to remote pages only —
+// the local setup and error pages (served from tauri.localhost) load instantly
+// and skip it. A 15s safety timeout guarantees the overlay never sticks.
+const LOADING_OVERLAY_JS: &str = r#"
+(function () {
+  if (location.protocol === "tauri:" || location.host === "tauri.localhost") return;
+  if (window.__omnifin_loader_installed) return;
+  window.__omnifin_loader_installed = true;
+  function build() {
+    if (document.getElementById("__omnifin_loader")) return;
+    var root = document.body || document.documentElement;
+    if (!root) return;
+    if (!document.getElementById("__omnifin_loader_style")) {
+      var style = document.createElement("style");
+      style.id = "__omnifin_loader_style";
+      style.textContent = "@keyframes __omnifin_spin{to{transform:rotate(360deg)}}";
+      (document.head || root).appendChild(style);
+    }
+    var o = document.createElement("div");
+    o.id = "__omnifin_loader";
+    o.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:#000000;color:#f9fafb;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;transition:opacity .25s ease;";
+    o.innerHTML = "<div style=\"width:40px;height:40px;border:3px solid rgba(245, 158, 11,.25);border-top-color:#f59e0b;border-radius:50%;animation:__omnifin_spin .8s linear infinite;\"></div><div style=\"font-size:14px;color:#9ca3af;\">Loading Omnifin…</div>";
+    root.appendChild(o);
+  }
+  function remove() {
+    var o = document.getElementById("__omnifin_loader");
+    if (!o) return;
+    o.style.opacity = "0";
+    setTimeout(function () { o.remove(); }, 260);
+  }
+  build();
+  document.addEventListener("readystatechange", build);
+  window.addEventListener("DOMContentLoaded", build);
+  window.addEventListener("load", remove);
+  setTimeout(remove, 15000);
+})();
+"#;
+
 // Build a fresh window pointed at the given target. Used on app launch,
 // "Change Server URL…", and "New Window".
 fn open_window_for(
@@ -170,6 +231,8 @@ fn open_window_for(
         .inner_size(1280.0, 800.0)
         .min_inner_size(720.0, 480.0)
         .center()
+        .initialization_script(WAKE_REFRESH_JS)
+        .initialization_script(LOADING_OVERLAY_JS)
         .build()
 }
 
@@ -403,7 +466,7 @@ fn open_find_in_page(app: &AppHandle) {
     if (existing) { existing.querySelector('input').focus(); return; }
     var bar = document.createElement('div');
     bar.id = '__omnifin_find_bar';
-    bar.style.cssText = 'position:fixed;top:8px;right:8px;z-index:2147483647;background:#12121a;color:#f9fafb;border:1px solid #6366f1;border-radius:8px;padding:6px 8px;display:flex;gap:6px;align-items:center;font-family:-apple-system,sans-serif;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,0.4);';
+    bar.style.cssText = 'position:fixed;top:8px;right:8px;z-index:2147483647;background:#0a0a0a;color:#f9fafb;border:1px solid #f59e0b;border-radius:8px;padding:6px 8px;display:flex;gap:6px;align-items:center;font-family:-apple-system,sans-serif;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,0.4);';
     bar.innerHTML = '<input id="__omnifin_find_input" placeholder="Find on page" style="background:#1e1e28;color:#f9fafb;border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:4px 8px;width:220px;outline:none;font:inherit;"/><span id="__omnifin_find_count" style="opacity:0.6;min-width:40px;">0/0</span><button id="__omnifin_find_close" style="background:transparent;color:#9ca3af;border:0;cursor:pointer;font-size:16px;">×</button>';
     document.body.appendChild(bar);
     var input = bar.querySelector('input');
