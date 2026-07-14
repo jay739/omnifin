@@ -46,3 +46,6 @@ js/
 .DS_Store
 Thumbs.db
 omnifin
+
+# landing page for apps.jay739.dev is tracked; generated docs stay ignored
+!docs/index.html
