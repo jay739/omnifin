@@ -1,0 +1,22 @@
+# Twin of test.yml for changes test.yml deliberately ignores (docs, markdown,
+# workflow files). It reports the same required "build-and-test" context so
+# docs-only PRs are not deadlocked by branch protection, without paying for a
+# full build.
+name: CI - build and test
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "**/*.md"
+      - "docs/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Docs-only change; the full build is intentionally skipped."
