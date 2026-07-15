@@ -6,11 +6,11 @@
 [![Based on jfa-go](https://img.shields.io/badge/based%20on-hrfee%2Fjfa--go-6366f1)](https://github.com/hrfee/jfa-go)
 
 > **Hard fork of [hrfee/jfa-go](https://github.com/hrfee/jfa-go) by Harvey Tindall.**
-> The original design, architecture, and the vast majority of the codebase belong to Harvey Tindall and the jfa-go contributors. Omnifin exists to extend it with tighter Jellyfin integration, a redesigned UI/email system, and homelab-focused features. All original copyright is preserved — see [Credits](#credits--acknowledgements).
+> The original design, architecture, and the vast majority of the codebase belong to Harvey Tindall and the jfa-go contributors. Omnifin exists to extend it with tighter Jellyfin integration, a redesigned UI/email system, and homelab-focused features. All original copyright is preserved; see [Credits](#credits--acknowledgements).
 
 ---
 
-**Omnifin** is a unified Jellyfin user-management toolkit — invites, account lifecycle, password resets, multi-channel notifications, and deep Jellyfin integration, packaged into a single self-hosted binary.
+**Omnifin** is a unified Jellyfin user-management toolkit: invites, account lifecycle, password resets, multi-channel notifications, and deep Jellyfin integration, packaged into a single self-hosted binary.
 
 ##### Quick links: [Desktop client](#desktop-client-tauri) · [Docker](#docker) · [Build from source](#build-from-source) · [Migrate from jfa-go](#migration-from-jfa-go) · [Credits](#credits--acknowledgements)
 
@@ -28,7 +28,7 @@ Announcement emails and markdown templates can embed live Jellyfin library data 
 |---|---|
 | `{{recent_movies_grid}}` | 3-column poster grid of the 6 most recently added movies, each linked to the Jellyfin detail page |
 | `{{recent_shows_grid}}` | Same for TV series |
-| `{{featured_movie}}` | Full card — large poster, title, year, rating, genres, overview excerpt, "Watch Now" button |
+| `{{featured_movie}}` | Full card, large poster, title, year, rating, genres, overview excerpt, "Watch Now" button |
 | `{{featured_show}}` | Same for the most recently added show |
 | `{{recent_movies}}` | Plain markdown bullet list (title + year + rating) |
 | `{{recent_shows}}` | Same for shows |
@@ -50,7 +50,7 @@ Plus Jellystat-backed analytics (pulled from a sidecar `jellyfin-stats-api` serv
 | `{{top_clients_30d}}` | Most-used Jellyfin client apps |
 | `{{watch_plays_30d}}` / `{{watch_time_30d}}` / `{{active_watchers_30d}}` | Headline numbers |
 
-The **announcement preview** in the admin panel live-substitutes all variables — including poster images — so you see the final rendered result before sending.
+The **announcement preview** in the admin panel live-substitutes all variables, including poster images, so you see the final rendered result before sending.
 
 ### Smart user selection
 
@@ -61,7 +61,7 @@ The **announcement preview** in the admin panel live-substitutes all variables �
 - Never logged in
 - Clear selection
 
-The selection then plugs into any existing bulk action — most useful for sending a targeted "we miss you" announcement to everyone inactive 30+ days, or extending expiries on everyone who's active.
+The selection then plugs into any existing bulk action, most useful for sending a targeted "we miss you" announcement to everyone inactive 30+ days, or extending expiries on everyone who's active.
 
 ### Scheduled announcements
 
@@ -87,7 +87,7 @@ Payload format: `{event, payload, sent_at}`. Fan-out is goroutine-bounded (16-sl
 
 ### Send-test-to-admin
 
-Every announce modal has a **"Send test to me"** button — delivers the exact email (with all `{{vars}}` substituted) only to the logged-in admin's own account, via every configured channel. Used to catch typos and broken layout before pushing to N users.
+Every announce modal has a **"Send test to me"** button that delivers the exact email (with all `{{vars}}` substituted) only to the logged-in admin's own account, via every configured channel. Used to catch typos and broken layout before pushing to N users.
 
 ### Dashboard Jellystat widget
 
@@ -107,9 +107,9 @@ All transactional emails (welcome, invite, password reset, expiry reminder, acco
 - **Rate limiting** on all public-facing endpoints: login (10 req/min), invite signup (5 req/min), password reset (5 req/min)
 - **Security response headers** on every response: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security` (when behind TLS proxy)
 - **Swagger UI** moved behind authentication
-- **XSS fix** in the invite form — username HTML-escaped before DOM insertion
-- **Auth header panic fix** — malformed `Authorization` headers no longer crash the server
-- **Backup upload cap** — 100 MB limit on restore file uploads
+- **XSS fix** in the invite form, username HTML-escaped before DOM insertion
+- **Auth header panic fix**: malformed `Authorization` headers no longer crash the server
+- **Backup upload cap**: 100 MB limit on restore file uploads
 
 ### UI / UX
 
@@ -117,22 +117,22 @@ All transactional emails (welcome, invite, password reset, expiry reminder, acco
 - Dashboard activity widget
 - Announcement draft auto-saved to `localStorage`
 - Drag-and-drop `.md` file loading into the announcement editor
-- Variable chips in the announcement editor — click to insert `{{varname}}` at cursor
-- Sidebar locked before login — cannot interact with navigation before authentication completes
+- Variable chips in the announcement editor, click to insert `{{varname}}` at cursor
+- Sidebar locked before login, cannot interact with navigation before authentication completes
 
 ---
 
 ## Core features (inherited from jfa-go)
 
-- **Invites** — single- or multi-use signup links with per-invite expiry, library profiles, captcha, and email-the-invite
-- **Account lifecycle** — per-user expiry with auto-disable / auto-delete; expiry reminder emails
-- **Password resets** — email-based flow bridging Jellyfin's PIN system; self-service reset on the My Account page
-- **My Account page** — users update password, email, notification contacts; optional referral invite links
-- **Multi-channel messaging** — SMTP / Mailgun, Telegram, Discord, Matrix; per-event templates
-- **Bulk admin tools** — enable/disable, delete, apply profiles, send Markdown announcements
-- **Integrations** — Jellyseerr & Ombi provisioning, Discord role assignment, Telegram/Matrix contact linking
-- **Backups** — scheduled BadgerDB snapshots with configurable retention
-- **Activity log** — auditable record of all admin and lifecycle events
+- **Invites**: single- or multi-use signup links with per-invite expiry, library profiles, captcha, and email-the-invite
+- **Account lifecycle**: per-user expiry with auto-disable / auto-delete; expiry reminder emails
+- **Password resets**: email-based flow bridging Jellyfin's PIN system; self-service reset on the My Account page
+- **My Account page**: users update password, email, notification contacts; optional referral invite links
+- **Multi-channel messaging**: SMTP / Mailgun, Telegram, Discord, Matrix; per-event templates
+- **Bulk admin tools**: enable/disable, delete, apply profiles, send Markdown announcements
+- **Integrations**: Jellyseerr & Ombi provisioning, Discord role assignment, Telegram/Matrix contact linking
+- **Backups**: scheduled BadgerDB snapshots with configurable retention
+- **Activity log**: auditable record of all admin and lifecycle events
 
 ---
 
@@ -140,7 +140,7 @@ All transactional emails (welcome, invite, password reset, expiry reminder, acco
 
 ### Desktop client (Tauri)
 
-A separate native desktop client is shipped alongside the server. It's **not** another server — it's a thin native window (built with Tauri 2.x + Rust) that points at an Omnifin server you've already deployed. Think of it like Discord Desktop or Notion Desktop: a native shell around the web UI.
+A separate native desktop client is shipped alongside the server. It's **not** another server, it's a thin native window (built with Tauri 2.x + Rust) that points at an Omnifin server you've already deployed. Think of it like Discord Desktop or Notion Desktop: a native shell around the web UI.
 
 On first launch it asks for your server URL (e.g. `https://omnifin.example.com` or `http://192.168.1.10:8056`), saves it locally, and from then on it opens straight to that server.
 
@@ -148,22 +148,22 @@ On first launch it asks for your server URL (e.g. `https://omnifin.example.com` 
 
 | Connect | Login | Dashboard |
 |:---:|:---:|:---:|
-| ![Desktop client — connect to server](images/01-omnifin-desktop-client-connect.png) | ![Desktop client — login](images/03-omnifin-desktop-client-login.png) | ![Desktop client — dashboard](images/02-omnifin-desktop-client-dashboard.png) |
+| ![Desktop client, connect to server](images/01-omnifin-desktop-client-connect.png) | ![Desktop client, login](images/03-omnifin-desktop-client-login.png) | ![Desktop client, dashboard](images/02-omnifin-desktop-client-dashboard.png) |
 | Point the client at your Omnifin server | Sign in with your admin credentials | Manage users, invites, and announcements |
 
 **Native features:**
 - System tray icon (left-click → show, right-click → quick menu)
 - Native menu bar: Change Server URL (⌘,), Reload (⌘R), Find in Page (⌘F), Open in Default Browser (⌘⇧O), Zoom (⌘+/-/0), Quit (⌘Q)
 - Recent Servers submenu (auto-populated, last 5)
-- New Window (⌘N) — open a second window pointed at a different Omnifin server
+- New Window (⌘N), open a second window pointed at a different Omnifin server
 - Window size + position persisted across launches
-- Single-instance enforced — second launch focuses the existing window
+- Single-instance enforced, second launch focuses the existing window
 - Window title shows the current server host
 - Standard Edit menu (Undo / Redo / Cut / Copy / Paste / Select All)
 
 **Downloads on every [GitHub Release](https://github.com/jay739/omnifin/releases):**
 
-- **macOS:** `Omnifin_<ver>_aarch64.dmg` (Apple Silicon — runs on Intel via Rosetta 2)
+- **macOS:** `Omnifin_<ver>_aarch64.dmg` (Apple Silicon, runs on Intel via Rosetta 2)
 - **Windows:** `Omnifin_<ver>_x64-setup.exe` (NSIS installer)
 - **Linux:** `Omnifin_<ver>_amd64.deb` / `.AppImage` / `_x86_64.rpm`
 
@@ -233,7 +233,7 @@ services:
 
 - Go 1.24+
 - Node.js 20+, npm
-- `swag` — `go install github.com/swaggo/swag/cmd/swag@v1.16.4`
+- `swag`: `go install github.com/swaggo/swag/cmd/swag@v1.16.4`
 - `make`
 
 #### Steps
@@ -272,9 +272,9 @@ image: jayakrishnakonda/omnifin:latest
 
 **Everything else carries over unchanged:**
 
-- Existing `/data` directory — same BadgerDB schema
-- Existing `config.ini` — `jfa-go:` template prefix and `/jfa-go/config/...` paths are still resolved
-- Existing backups (`jfa-go-db-*.bak`) — restorable via `-restore`
+- Existing `/data` directory, same BadgerDB schema
+- Existing `config.ini`, `jfa-go:` template prefix and `/jfa-go/config/...` paths are still resolved
+- Existing backups (`jfa-go-db-*.bak`), restorable via `-restore`
 - All user accounts, invites, profiles, custom emails, announcement templates
 
 The legacy `/jfa-go/config` bind-mount target is still recognised, so existing Compose files keep working without changes.
@@ -340,7 +340,7 @@ For bugs or features that are not specific to Omnifin's divergence from upstream
 
 ## Credits & Acknowledgements
 
-### Original author — Harvey Tindall (hrfee)
+### Original author, Harvey Tindall (hrfee)
 
 **[jfa-go](https://github.com/hrfee/jfa-go)** was created and is maintained by **[Harvey Tindall](https://github.com/hrfee)**. The core architecture, user management engine, multi-channel notification system, invite system, MJML pipeline, and the vast majority of the Go and TypeScript code in this repository are Harvey's work.
 
@@ -350,14 +350,14 @@ All jfa-go contributors: [hrfee/jfa-go/graphs/contributors](https://github.com/h
 
 ### Omnifin maintainer
 
-Jayakrishna Konda — [github.com/jay739](https://github.com/jay739)
+Jayakrishna Konda, [github.com/jay739](https://github.com/jay739)
 
 ### Stack this builds on
 
-- **[Jellyfin](https://github.com/jellyfin/jellyfin)** — open-source media server
-- **[gin-gonic/gin](https://github.com/gin-gonic/gin)** — HTTP framework
-- **[MJML](https://mjml.io/)** — responsive email framework
-- **[BadgerDB](https://github.com/dgraph-io/badger)** — embedded key-value store
+- **[Jellyfin](https://github.com/jellyfin/jellyfin)**: open-source media server
+- **[gin-gonic/gin](https://github.com/gin-gonic/gin)**: HTTP framework
+- **[MJML](https://mjml.io/)**: responsive email framework
+- **[BadgerDB](https://github.com/dgraph-io/badger)**: embedded key-value store
 - Jellyseerr, Ombi, Authentik, Tailscale, and the broader self-hosting community
 
 ---
