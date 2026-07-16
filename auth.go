@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -306,6 +307,23 @@ func (app *appContext) validateJellyfinCredentials(username, password string, gc
 		} else if errors.As(err, &mediabrowser.ErrForbidden{}) {
 			app.logIpInfo(gc, userpage, fmt.Sprintf(lm.FailedAuthRequest, lm.UserDisabled))
 			respond(403, "yourAccountWasDisabled", gc)
+			return
+		}
+		// This is the actual live failure mode when Jellyfin's container is
+		// stopped (not just slow/erroring): mb.httpClient.Do(req) inside
+		// Authenticate() fails outright (DNS lookup failure for the Jellyfin
+		// hostname, connection refused, etc.) and returns a genuine non-nil
+		// net/url error -- NOT the recovered-panic nil-err case handled
+		// above. Neither ErrUnauthorized nor ErrForbidden match a network
+		// error, so it used to fall through to a generic 500 here. Detect
+		// the network-failure shape specifically so this reads as "Jellyfin
+		// unreachable" (503) instead of an opaque "Jellyfin error" (500) --
+		// found live 2026-07-16 testing with real credentials against a
+		// stopped Jellyfin container, which returns exactly this error shape.
+		var netErr *url.Error
+		if errors.As(err, &netErr) {
+			app.authLog(fmt.Sprintf(lm.FailedAuthJellyfin, app.jf.Server, 0, err))
+			respond(503, "Jellyfin unreachable", gc)
 			return
 		}
 		app.authLog(fmt.Sprintf(lm.FailedAuthJellyfin, app.jf.Server, 0, err))
