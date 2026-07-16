@@ -91,7 +91,7 @@ func (app *appContext) NewUserPostVerification(p NewUserParams) (out NewUserData
 	}
 
 	var err error
-	out.User, err = app.jf.NewUser(p.Req.Username, p.Req.Password)
+	out.User, err = app.safeNewUser(p.Req.Username, p.Req.Password)
 	if err != nil {
 		out.Message = err.Error()
 		deferLogError(lm.FailedCreateUser, lm.Jellyfin, p.Req.Username, out.Message)
@@ -237,7 +237,7 @@ func (app *appContext) DeleteUser(user mediabrowser.User) (err error, deleted bo
 		}
 	}
 
-	err = app.jf.DeleteUser(user.ID)
+	err = app.safeDeleteUser(user.ID)
 	if err != nil {
 		return
 	}
