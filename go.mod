@@ -18,7 +18,7 @@ replace github.com/jay739/omnifin/easyproxy => ./easyproxy
 
 replace github.com/jay739/omnifin/jellyseerr => ./jellyseerr
 
-// replace github.com/hrfee/mediabrowser => ../mediabrowser
+replace github.com/hrfee/mediabrowser => ./vendor-mediabrowser
 
 require (
 	github.com/bwmarrin/discordgo v0.29.0
