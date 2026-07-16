@@ -269,10 +269,22 @@ func (app *appContext) validateJellyfinCredentials(username, password string, gc
 	// response body (respData["AccessToken"].(string)) and panics with a nil
 	// pointer dereference if Jellyfin is unreachable and returns a non-JSON
 	// body (e.g. a proxy error page) instead of a clean connection error.
-	// Recovering here turns that into a normal 503 instead of taking down the
-	// request -- and with jellyfin_login enabled, every admin login goes
-	// through this path, so a Jellyfin outage would otherwise block admin
-	// access to the panel entirely, including for sending downtime notices.
+	//
+	// CRITICAL: that panic is already recovered INSIDE the library itself, by
+	// a defer mb.timeoutHandler() registered in Authenticate() before this
+	// call -- mediabrowser.NewNamedTimeoutHandler(..., noFail=true), wired up
+	// in main.go. It logs "Failed to authenticate with Jellyfin @ ..." via
+	// the stdlib log package (NOT app.err/app.debug, which is why it was so
+	// hard to trace) and lets Authenticate() return normally afterward. But
+	// the panic happened before `mb.Authenticated = true` and before
+	// `return user, nil` execute, so Authenticate() returns a ZERO-VALUE User{}
+	// with a NIL error -- indistinguishable from a real success by an err/=nil
+	// check alone. The defer/recover() below is intentionally kept as a
+	// backstop in case a future library version removes its own internal
+	// recovery, but it will not fire in practice: the REAL fix is checking
+	// app.authJf.Authenticated (or equivalently user.ID == "") after the call,
+	// which is what actually distinguishes "Jellyfin unreachable" from "empty
+	// user genuinely authenticated" (impossible) below.
 	defer func() {
 		if r := recover(); r != nil {
 			app.authLog(fmt.Sprintf(lm.FailedAuthJellyfin, app.jf.Server, 0, fmt.Errorf("panic in Jellyfin auth client (Jellyfin likely unreachable): %v", r)))
@@ -281,6 +293,11 @@ func (app *appContext) validateJellyfinCredentials(username, password string, gc
 		}
 	}()
 	user, err := app.authJf.Authenticate(username, password)
+	if err == nil && !app.authJf.Authenticated {
+		app.authLog(fmt.Sprintf(lm.FailedAuthJellyfin, app.jf.Server, 0, fmt.Errorf("Jellyfin unreachable (client recovered internally from a connection failure)")))
+		respond(503, "Jellyfin unreachable", gc)
+		return
+	}
 	if err != nil {
 		if errors.As(err, &mediabrowser.ErrUnauthorized{}) {
 			app.logIpInfo(gc, userpage, fmt.Sprintf(lm.FailedAuthRequest, lm.InvalidUserOrPass))
