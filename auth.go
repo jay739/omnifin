@@ -220,6 +220,24 @@ func (app *appContext) safeUserByName(username string, public bool) (user mediab
 	return app.jf.UserByName(username, public)
 }
 
+func (app *appContext) safeNewUser(username, password string) (user mediabrowser.User, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in Jellyfin client (Jellyfin likely unreachable): %v", r)
+		}
+	}()
+	return app.jf.NewUser(username, password)
+}
+
+func (app *appContext) safeDeleteUser(userID string) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in Jellyfin client (Jellyfin likely unreachable): %v", r)
+		}
+	}()
+	return app.jf.DeleteUser(userID)
+}
+
 func (app *appContext) canAccessAdminPage(user mediabrowser.User, emailStore EmailAddress) bool {
 	// 1. "Allow all" is enabled, so simply being a user implies access.
 	if app.config.Section("ui").Key("allow_all").MustBool(false) && user.ID != "" {

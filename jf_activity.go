@@ -26,6 +26,18 @@ type activityLogEntrySource interface {
 	GetActivityLog(skip, limit int, since time.Time, hasUserID bool) (mediabrowser.ActivityLog, error)
 }
 
+// safeGetActivityLog recovers from a panic in GetActivityLog (see the comment
+// at its call site in MaybeSync for why it can panic) and returns a clean
+// error instead.
+func safeGetActivityLog(jf activityLogEntrySource, skip, limit int, since time.Time, hasUserID bool) (al mediabrowser.ActivityLog, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in Jellyfin client (Jellyfin likely unreachable): %v", r)
+		}
+	}()
+	return jf.GetActivityLog(skip, limit, since, hasUserID)
+}
+
 // JFActivityCache is a cache for Jellyfin ActivityLogEntries, intended to be refreshed frequently
 // and suited to it by only querying for changes since the last refresh.
 type JFActivityCache struct {
@@ -133,7 +145,16 @@ func (c *JFActivityCache) MaybeSync() error {
 			// If we haven't synced, this'll just get max (ActivityLimit),
 			// If we have, it'll get anything that's happened since then
 			thisSync := time.Now()
-			al, err := c.jf.GetActivityLog(-1, ActivityLimit, c.LastYieldingSync, true)
+			// hrfee/mediabrowser's GetActivityLog lazily calls Authenticate()
+			// internally whenever the client isn't currently authenticated, which
+			// panics with a nil pointer dereference on an unreachable Jellyfin
+			// (see auth.go's safeUserByID/safeGetUsers for the same guard on
+			// other MediaBrowser methods -- this one lives in a different
+			// interface-typed field so it needs its own local recover). Found
+			// live 2026-07-16: this was the actual source of the panic bursts
+			// after #64/#65 shipped, since the admin panel's activity widget
+			// triggers a sync on every poll.
+			al, err := safeGetActivityLog(c.jf, -1, ActivityLimit, c.LastYieldingSync, true)
 			if err != nil {
 				c.syncLock.Lock()
 				c.syncing = false
