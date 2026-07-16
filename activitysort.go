@@ -174,6 +174,36 @@ func (act Activity) MustGetSourceUsername(jf *mediabrowser.MediaBrowser) string 
 	return user.Name
 }
 
+// SafeGetUsername/SafeGetSourceUsername wrap MustGetUsername/MustGetSourceUsername
+// with a panic recover. jf.UserByID (called internally, above) lazily
+// re-authenticates via hrfee/mediabrowser's Authenticate() whenever the
+// client isn't currently authenticated, which panics with a nil pointer
+// dereference on an unreachable Jellyfin (see auth.go's safeUserByID for the
+// appContext-scoped version of this same guard -- these can't reuse it since
+// MustGetUsername/MustGetSourceUsername take a raw *mediabrowser.MediaBrowser,
+// not an *appContext). Found live 2026-07-16: GetActivities (POST /activity,
+// polled by the admin panel's activity widget every 30s per admin.ts) was
+// panicking on this exact path, recovered only by gin's global middleware --
+// the #64 fix covered app.jf.* call sites but missed these two, which call
+// jf.UserByID directly on the raw MediaBrowser pointer.
+func (act Activity) SafeGetUsername(jf *mediabrowser.MediaBrowser) (name string) {
+	defer func() {
+		if r := recover(); r != nil {
+			name = ""
+		}
+	}()
+	return act.MustGetUsername(jf)
+}
+
+func (act Activity) SafeGetSourceUsername(jf *mediabrowser.MediaBrowser) (name string) {
+	defer func() {
+		if r := recover(); r != nil {
+			name = ""
+		}
+	}()
+	return act.MustGetSourceUsername(jf)
+}
+
 func ActivityDBQueryFromSpecialField(jf *mediabrowser.MediaBrowser, query *badgerhold.Query, q QueryDTO) *badgerhold.Query {
 	switch q.Field {
 	case "mentionedUsers":
@@ -195,7 +225,7 @@ func matchMentionedUsersAsQuery(jf *mediabrowser.MediaBrowser, query *badgerhold
 	criterion := andField(query, "UserID")
 	query = criterion.MatchFunc(func(ra *badgerhold.RecordAccess) (bool, error) {
 		act := ra.Record().(*Activity)
-		usernames := act.MustGetUsername(jf) + " " + act.MustGetSourceUsername(jf)
+		usernames := act.SafeGetUsername(jf) + " " + act.SafeGetSourceUsername(jf)
 		return strings.Contains(strings.ToLower(usernames), strings.ToLower(q.Value.(string))), nil
 	})
 	return query
@@ -208,7 +238,7 @@ func matchActorAsQuery(jf *mediabrowser.MediaBrowser, query *badgerhold.Query, q
 		act := ra.Record().(*Activity)
 		matchString := activitySourceToString(act.SourceType)
 		if act.SourceType == ActivityAdmin || act.SourceType == ActivityUser && act.SourceIsUser() {
-			matchString += " " + act.MustGetSourceUsername(jf)
+			matchString += " " + act.SafeGetSourceUsername(jf)
 		}
 		return strings.Contains(strings.ToLower(matchString), strings.ToLower(q.Value.(string))), nil
 	})
@@ -223,7 +253,7 @@ func matchReferrerAsQuery(jf *mediabrowser.MediaBrowser, query *badgerhold.Query
 		if act.Type != ActivityCreation || act.SourceType != ActivityUser || !act.SourceIsUser() {
 			return false, nil
 		}
-		sourceUsername := act.MustGetSourceUsername(jf)
+		sourceUsername := act.SafeGetSourceUsername(jf)
 		if q.Class == BoolQuery {
 			val := sourceUsername != ""
 			if q.Value.(bool) == false {
