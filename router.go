@@ -239,6 +239,7 @@ func (app *appContext) loadRoutes(router *gin.Engine) {
 		api.DELETE(p+"/users", app.DeleteUsers)
 		api.GET(p+"/users", app.GetUsers)
 		api.GET(p+"/users/count", app.GetUserCount)
+		api.GET(p+"/users/persisted", app.GetPersistedUsers)
 		api.POST(p+"/users", app.SearchUsers)
 		api.POST(p+"/users/count", app.GetFilteredUserCount)
 		api.POST(p+"/users/filter", app.FilterUsers)

@@ -206,6 +206,20 @@ type getUsersDTO struct {
 	LastPage bool        `json:"last_page"`
 }
 
+// persistedUserDTO is a user record from omnifin's own storage, independent
+// of a live Jellyfin connection -- see GetPersistedUsers.
+type persistedUserDTO struct {
+	JellyfinID string `json:"jellyfin_id"`
+	Email      string `json:"email"`
+	Label      string `json:"label"`
+	Contact    bool   `json:"contact"`
+	Admin      bool   `json:"admin"`
+}
+
+type getPersistedUsersDTO struct {
+	Users []persistedUserDTO `json:"users"`
+}
+
 type ombiUser struct {
 	Name string `json:"name,omitempty" example:"jeff"` // Name of Ombi user
 	ID   string `json:"id" example:"djgkjdg7dkjfsj8"`  // userID of Ombi user
