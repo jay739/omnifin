@@ -449,6 +449,9 @@ func start(asDaemon, firstCall bool) {
 			cacheTimeout,
 		)
 		if err != nil {
+			// NewServer failing means bad config (malformed server URL etc.), not
+			// a reachability problem -- still fatal, since nothing downstream can
+			// recover from a genuinely broken client construction.
 			app.err.Fatalf(lm.FailedAuthJellyfin, server, -1, err)
 		}
 		app.jf.activity = NewJFActivityCache(
@@ -467,12 +470,24 @@ func start(asDaemon, firstCall bool) {
 			RetryGap:    time.Duration(app.config.Section("advanced").Key("auth_retry_gap").MustInt(10)) * time.Second,
 			LogFailures: true,
 		}
+		// Jellyfin being unreachable at boot is no longer fatal: omnifin's admin
+		// panel is meant to stay usable (viewing users, sending downtime
+		// announcements, etc.) even during a Jellyfin outage or maintenance
+		// window, and killing the whole container here defeats that. The one
+		// place a downstream app.jf.* call could previously panic instead of
+		// erroring cleanly (Authenticate(), an unchecked type assertion in the
+		// hrfee/mediabrowser client) is already guarded via recover() in
+		// validateJellyfinCredentials/ChangeMyPassword (#62) -- other app.jf.*
+		// call sites return ordinary Go errors, so a failed startup auth just
+		// means those calls keep failing gracefully (500s, not crashes) until
+		// Jellyfin comes back, instead of the app never starting at all.
 		_, err = app.jf.MustAuthenticate(app.config.Section("jellyfin").Key("username").String(), app.config.Section("jellyfin").Key("password").String(), retryOpts)
 		if err != nil {
-			app.err.Fatalf(lm.FailedAuthJellyfin, server, status, err)
+			app.err.Printf(lm.FailedAuthJellyfin, server, status, fmt.Errorf("continuing in degraded mode, Jellyfin-dependent features will fail until it's reachable: %w", err))
+		} else {
+			app.info.Printf(lm.AuthJellyfin, server)
+			app.debug.Printf(lm.AsUser, app.jf.Username)
 		}
-		app.info.Printf(lm.AuthJellyfin, server)
-		app.debug.Printf(lm.AsUser, app.jf.Username)
 
 		runMigrations(app)
 
