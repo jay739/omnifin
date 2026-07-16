@@ -1212,6 +1212,39 @@ func (app *appContext) GetUserCount(gc *gin.Context) {
 	gc.JSON(200, resp)
 }
 
+// @Summary Returns every user omnifin has an email/contact record for, from
+// its own persistent storage -- does NOT require Jellyfin to be reachable.
+// @description Unlike GetUsers/SearchUsers (which need a live Jellyfin
+// connection), this reads app.storage's own badger DB directly. Useful for
+// sending maintenance/downtime notices while Jellyfin itself is down --
+// found live 2026-07-16 that the admin panel's Users tab is completely
+// unusable during a Jellyfin outage, even after the underlying panics/500s
+// were fixed (#62-#71), since it fundamentally needs live Jellyfin data.
+// This trades completeness (no online status, no last-active, no admin
+// flag from Jellyfin, and only shows users who have a stored email/contact
+// record at all) for availability.
+// @Produce json
+// @Success 200 {object} getPersistedUsersDTO
+// @Router /users/persisted [get]
+// @Security Bearer
+// @tags Users
+func (app *appContext) GetPersistedUsers(gc *gin.Context) {
+	emails := app.storage.GetEmails()
+	resp := getPersistedUsersDTO{
+		Users: make([]persistedUserDTO, 0, len(emails)),
+	}
+	for _, e := range emails {
+		resp.Users = append(resp.Users, persistedUserDTO{
+			JellyfinID: e.JellyfinID,
+			Email:      e.Addr,
+			Label:      e.Label,
+			Contact:    e.Contact,
+			Admin:      e.Admin,
+		})
+	}
+	gc.JSON(200, resp)
+}
+
 // @Summary Returns the list of all labels on accounts.
 // @Produce json
 // @Success 200 {object} LabelsDTO
