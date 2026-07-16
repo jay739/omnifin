@@ -34,7 +34,7 @@ func (app *appContext) checkUsers(remindBeforeExpiry *DayTimerSet) {
 	}
 
 	app.info.Println(lm.CheckUserExpiries)
-	users, err := app.jf.GetUsers(false)
+	users, err := app.safeGetUsers(false)
 	if err != nil {
 		app.err.Printf(lm.FailedGetUsers, lm.Jellyfin, err)
 		return

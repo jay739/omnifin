@@ -74,7 +74,7 @@ func (app *appContext) SynchronizeJellyseerrUsers() {
 		return
 	}
 
-	users, err := app.jf.GetUsers(false)
+	users, err := app.safeGetUsers(false)
 	if err != nil {
 		app.err.Printf(lm.FailedGetUsers, lm.Jellyfin, err)
 		return

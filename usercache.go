@@ -79,7 +79,7 @@ func (c *UserCache) MaybeSync(app *appContext) error {
 		c.Syncing = true
 		c.SyncLock.Unlock()
 		if !alreadySyncing {
-			users, err := app.jf.GetUsers(false)
+			users, err := app.safeGetUsers(false)
 			if err != nil {
 				c.SyncLock.Lock()
 				c.Syncing = false

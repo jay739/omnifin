@@ -176,9 +176,9 @@ func (app *appContext) ResetSetPassword(gc *gin.Context) {
 	var user mediabrowser.User
 	var err error
 	if isInternal {
-		user, err = app.jf.UserByID(userID, false)
+		user, err = app.safeUserByID(userID, false)
 	} else {
-		user, err = app.jf.UserByName(username, false)
+		user, err = app.safeUserByName(username, false)
 	}
 	if err != nil {
 		app.err.Printf(lm.FailedGetUser, userID, lm.Jellyfin, err)

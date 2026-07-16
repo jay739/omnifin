@@ -21,7 +21,7 @@ const (
 // GenInternalReset generates a local password reset PIN, for use with the PWR option on the Admin page.
 func (app *appContext) GenInternalReset(userID string) (InternalPWR, error) {
 	pin := genAuthToken()
-	user, err := app.jf.UserByID(userID, false)
+	user, err := app.safeUserByID(userID, false)
 	if err != nil {
 		return InternalPWR{}, err
 	}
@@ -117,7 +117,7 @@ func validatePWR(app *appContext, fname string, attempt int) {
 		app.err.Printf(lm.PWRExpired, pwr.Username, pwr.Expiry)
 		return
 	}
-	user, err := app.jf.UserByName(pwr.Username, false)
+	user, err := app.safeUserByName(pwr.Username, false)
 	if err != nil || user.ID == "" {
 		app.err.Printf(lm.FailedGetUser, pwr.Username, lm.Jellyfin, err)
 		return

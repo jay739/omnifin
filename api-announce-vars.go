@@ -338,7 +338,7 @@ func buildAnnounceVars(app *appContext) map[string]string {
 		vars["recent_episodes"] = "_(could not fetch episodes)_"
 	}
 
-	if users, err := app.jf.GetUsers(false); err == nil {
+	if users, err := app.safeGetUsers(false); err == nil {
 		vars["user_count"] = fmt.Sprintf("%d", len(users))
 		// active in last 30 days = users with LastActivityDate within window.
 		cutoff := now.Add(-30 * 24 * time.Hour)
