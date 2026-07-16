@@ -156,8 +156,8 @@ func (app *appContext) GetActivities(gc *gin.Context) {
 			Value:          act.Value,
 			Time:           act.Time.Unix(),
 			IP:             act.IP,
-			Username:       act.MustGetUsername(app.jf.MediaBrowser),
-			SourceUsername: act.MustGetSourceUsername(app.jf.MediaBrowser),
+			Username:       act.SafeGetUsername(app.jf.MediaBrowser),
+			SourceUsername: act.SafeGetSourceUsername(app.jf.MediaBrowser),
 		}
 		if act.Type == ActivityDeletion || act.Type == ActivityCreation {
 			// Username would've been in here, clear it to avoid confusion to the consumer
