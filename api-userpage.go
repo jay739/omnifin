@@ -694,8 +694,25 @@ func (app *appContext) ChangeMyPassword(gc *gin.Context) {
 		respondBool(500, false, gc)
 		return
 	}
-	// Authenticate as user to confirm old password.
-	user, err = app.authJf.Authenticate(user.Name, req.Old)
+	// Authenticate as user to confirm old password. Guarded the same way as
+	// validateJellyfinCredentials in auth.go: hrfee/mediabrowser's Authenticate
+	// panics with a nil pointer dereference instead of returning a clean error
+	// when Jellyfin is unreachable, which would otherwise surface as a generic
+	// 500 via the global gin recovery middleware.
+	authOK := true
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				app.err.Printf(lm.FailedAuthJellyfin, app.jf.Server, 0, fmt.Errorf("panic in Jellyfin auth client (Jellyfin likely unreachable): %v", r))
+				respondBool(503, false, gc)
+				authOK = false
+			}
+		}()
+		user, err = app.authJf.Authenticate(user.Name, req.Old)
+	}()
+	if !authOK {
+		return
+	}
 	if err != nil {
 		respondBool(401, false, gc)
 		return
