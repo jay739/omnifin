@@ -208,6 +208,21 @@ func (app *appContext) canAccessAdminPageByID(jfID string) bool {
 
 func (app *appContext) validateJellyfinCredentials(username, password string, gc *gin.Context, userpage bool) (user mediabrowser.User, ok bool) {
 	ok = false
+	// hrfee/mediabrowser's Authenticate does an unchecked type assertion on the
+	// response body (respData["AccessToken"].(string)) and panics with a nil
+	// pointer dereference if Jellyfin is unreachable and returns a non-JSON
+	// body (e.g. a proxy error page) instead of a clean connection error.
+	// Recovering here turns that into a normal 503 instead of taking down the
+	// request -- and with jellyfin_login enabled, every admin login goes
+	// through this path, so a Jellyfin outage would otherwise block admin
+	// access to the panel entirely, including for sending downtime notices.
+	defer func() {
+		if r := recover(); r != nil {
+			app.authLog(fmt.Sprintf(lm.FailedAuthJellyfin, app.jf.Server, 0, fmt.Errorf("panic in Jellyfin auth client (Jellyfin likely unreachable): %v", r)))
+			respond(503, "Jellyfin unreachable", gc)
+			ok = false
+		}
+	}()
 	user, err := app.authJf.Authenticate(username, password)
 	if err != nil {
 		if errors.As(err, &mediabrowser.ErrUnauthorized{}) {
