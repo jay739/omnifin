@@ -29,7 +29,7 @@ func (app *appContext) MyDetails(gc *gin.Context) {
 		Id: gc.GetString("jfId"),
 	}
 
-	user, err := app.jf.UserByID(resp.Id, false)
+	user, err := app.safeUserByID(resp.Id, false)
 	if err != nil {
 		app.err.Printf(lm.FailedGetUsers, lm.Jellyfin, err)
 		respond(500, "Failed to get user", gc)
@@ -257,7 +257,7 @@ func (app *appContext) ModifyMyEmail(gc *gin.Context) {
 	}
 
 	if emailEnabled && app.config.Section("email_confirmation").Key("enabled").MustBool(false) {
-		user, err := app.jf.UserByID(id, false)
+		user, err := app.safeUserByID(id, false)
 		name := ""
 		if err == nil {
 			name = user.Name
@@ -688,7 +688,7 @@ func (app *appContext) ChangeMyPassword(gc *gin.Context) {
 			return
 		}
 	}
-	user, err := app.jf.UserByID(gc.GetString("jfId"), false)
+	user, err := app.safeUserByID(gc.GetString("jfId"), false)
 	if err != nil {
 		app.err.Printf(lm.FailedGetUser, gc.GetString("jfId"), lm.Jellyfin, err)
 		respondBool(500, false, gc)

@@ -181,6 +181,45 @@ func (app *appContext) decodeValidateLoginHeader(gc *gin.Context, userpage bool)
 	return
 }
 
+// hrfee/mediabrowser's GetUsers/UserByID/UserByName lazily call Authenticate()
+// internally whenever the client isn't currently authenticated (mb.Authenticated
+// == false) -- the same unchecked type assertion that panics on an unreachable
+// Jellyfin (see validateJellyfinCredentials above) is therefore reachable from
+// ANY app.jf.* call, not just the explicit login/password-change call sites,
+// any time Jellyfin has been unreachable since the last successful auth (e.g.
+// after the non-fatal startup change in main.go). Found live 2026-07-16: the
+// housekeeping/user daemons were panicking on every cycle, recovered only by
+// gin's global middleware, silently failing instead of returning a clean
+// error. These wrappers recover locally and return a clean error instead, and
+// call sites across the app should use them in place of the raw app.jf.*
+// method whenever the result needs to survive Jellyfin being down.
+func (app *appContext) safeGetUsers(public bool) (users []mediabrowser.User, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in Jellyfin client (Jellyfin likely unreachable): %v", r)
+		}
+	}()
+	return app.jf.GetUsers(public)
+}
+
+func (app *appContext) safeUserByID(userID string, public bool) (user mediabrowser.User, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in Jellyfin client (Jellyfin likely unreachable): %v", r)
+		}
+	}()
+	return app.jf.UserByID(userID, public)
+}
+
+func (app *appContext) safeUserByName(username string, public bool) (user mediabrowser.User, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in Jellyfin client (Jellyfin likely unreachable): %v", r)
+		}
+	}()
+	return app.jf.UserByName(username, public)
+}
+
 func (app *appContext) canAccessAdminPage(user mediabrowser.User, emailStore EmailAddress) bool {
 	// 1. "Allow all" is enabled, so simply being a user implies access.
 	if app.config.Section("ui").Key("allow_all").MustBool(false) && user.ID != "" {
@@ -198,7 +237,7 @@ func (app *appContext) canAccessAdminPage(user mediabrowser.User, emailStore Ema
 }
 
 func (app *appContext) canAccessAdminPageByID(jfID string) bool {
-	user, err := app.jf.UserByID(jfID, false)
+	user, err := app.safeUserByID(jfID, false)
 	if err != nil {
 		return false
 	}

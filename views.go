@@ -411,7 +411,7 @@ func (app *appContext) ResetPassword(gc *gin.Context) {
 
 	// Only log PWRs we know the user for.
 	if username != "" {
-		jfUser, err := app.jf.UserByName(username, false)
+		jfUser, err := app.safeUserByName(username, false)
 		if err == nil {
 			app.storage.SetActivityKey(shortuuid.New(), Activity{
 				Type:       ActivityResetPassword,
@@ -424,7 +424,7 @@ func (app *appContext) ResetPassword(gc *gin.Context) {
 	}
 
 	if app.config.Section("ombi").Key("enabled").MustBool(false) {
-		jfUser, err := app.jf.UserByName(username, false)
+		jfUser, err := app.safeUserByName(username, false)
 		if err != nil {
 			app.err.Printf(lm.FailedGetUser, username, lm.Jellyfin, err)
 			return
@@ -779,7 +779,7 @@ func (app *appContext) InviteProxy(gc *gin.Context) {
 
 	fromUser := ""
 	if invite.ReferrerJellyfinID != "" {
-		sender, err := app.jf.UserByID(invite.ReferrerJellyfinID, false)
+		sender, err := app.safeUserByID(invite.ReferrerJellyfinID, false)
 		if err == nil {
 			fromUser = sender.Name
 		}

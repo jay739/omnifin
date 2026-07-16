@@ -82,7 +82,7 @@ func (app *appContext) NewUserPostVerification(p NewUserParams) (out NewUserData
 		return
 	}
 
-	existingUser, _ := app.jf.UserByName(p.Req.Username, false)
+	existingUser, _ := app.safeUserByName(p.Req.Username, false)
 	if existingUser.Name != "" {
 		out.Message = lm.UserExists
 		deferLogInfo(lm.FailedCreateUser, lm.Jellyfin, p.Req.Username, out.Message)

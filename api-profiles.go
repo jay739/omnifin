@@ -176,7 +176,7 @@ func (app *appContext) CreateProfile(gc *gin.Context) {
 	var req newProfileDTO
 	gc.BindJSON(&req)
 	app.InvalidateJellyfinCache()
-	user, err := app.jf.UserByID(req.ID, false)
+	user, err := app.safeUserByID(req.ID, false)
 	if err != nil {
 		app.err.Printf(lm.FailedGetUsers, lm.Jellyfin, err)
 		respond(500, "Couldn't get user", gc)

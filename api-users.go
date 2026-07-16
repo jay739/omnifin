@@ -419,7 +419,7 @@ func (app *appContext) EnableDisableUsers(gc *gin.Context) {
 		activityType = ActivityEnabled
 	}
 	for _, userID := range req.Users {
-		user, err := app.jf.UserByID(userID, false)
+		user, err := app.safeUserByID(userID, false)
 		if err != nil {
 			errors["GetUser"][user.ID] = err.Error()
 			app.err.Printf(lm.FailedGetUser, user.ID, lm.Jellyfin, err)
@@ -497,7 +497,7 @@ func (app *appContext) DeleteUsers(gc *gin.Context) {
 	errors := map[string]string{}
 	sendMail := messagesEnabled
 	for _, userID := range req.Users {
-		user, err := app.jf.UserByID(userID, false)
+		user, err := app.safeUserByID(userID, false)
 		if err != nil {
 			app.err.Printf(lm.FailedGetUser, user.ID, lm.Jellyfin, err)
 			errors[userID] = err.Error()
@@ -609,7 +609,7 @@ func (app *appContext) ExtendExpiry(gc *gin.Context) {
 		app.storage.SetUserExpiryKey(id, expiry)
 		if messagesEnabled && req.Notify {
 			go func(uid string, exp time.Time) {
-				user, err := app.jf.UserByID(uid, false)
+				user, err := app.safeUserByID(uid, false)
 				if err != nil {
 					return
 				}
@@ -763,7 +763,7 @@ func (app *appContext) Announce(gc *gin.Context) {
 	unique := strings.Contains(req.Message, "{username}")
 	if unique {
 		for _, userID := range req.Users {
-			user, err := app.jf.UserByID(userID, false)
+			user, err := app.safeUserByID(userID, false)
 			if err != nil {
 				app.err.Printf(lm.FailedGetUser, userID, lm.Jellyfin, err)
 				continue
@@ -1155,7 +1155,7 @@ func (app *appContext) GetUserSummary(jfUser mediabrowser.User) respUser {
 func (app *appContext) FilterUsers(gc *gin.Context) {
 	var req userFilterDTO
 	gc.BindJSON(&req)
-	users, err := app.jf.GetUsers(false)
+	users, err := app.safeGetUsers(false)
 	if err != nil {
 		app.err.Printf(lm.FailedGetUsers, lm.Jellyfin, err)
 		respondAPIError(500, "errorJellyfin", "JELLYFIN_USERS", err.Error(), gc)
@@ -1202,7 +1202,7 @@ func (app *appContext) FilterUsers(gc *gin.Context) {
 // @tags Users,Statistics
 func (app *appContext) GetUserCount(gc *gin.Context) {
 	resp := PageCountDTO{}
-	users, err := app.jf.GetUsers(false)
+	users, err := app.safeGetUsers(false)
 	if err != nil {
 		app.err.Printf(lm.FailedGetUsers, lm.Jellyfin, err)
 		respond(500, "Couldn't get users", gc)
@@ -1242,7 +1242,7 @@ func (app *appContext) GetUser(gc *gin.Context) {
 		respondBool(400, false, gc)
 		return
 	}
-	user, err := app.jf.UserByID(userID, false)
+	user, err := app.safeUserByID(userID, false)
 	if err != nil {
 		switch err.(type) {
 		case mediabrowser.ErrUserNotFound:
@@ -1368,7 +1368,7 @@ func (app *appContext) GetFilteredUserCount(gc *gin.Context) {
 func (app *appContext) SetAccountsAdmin(gc *gin.Context) {
 	var req setAccountsAdminDTO
 	gc.BindJSON(&req)
-	users, err := app.jf.GetUsers(false)
+	users, err := app.safeGetUsers(false)
 	if err != nil {
 		app.err.Printf(lm.FailedGetUsers, lm.Jellyfin, err)
 		respond(500, "Couldn't get users", gc)
@@ -1401,7 +1401,7 @@ func (app *appContext) SetAccountsAdmin(gc *gin.Context) {
 func (app *appContext) ModifyLabels(gc *gin.Context) {
 	var req modifyEmailsDTO
 	gc.BindJSON(&req)
-	users, err := app.jf.GetUsers(false)
+	users, err := app.safeGetUsers(false)
 	if err != nil {
 		app.err.Printf(lm.FailedGetUsers, lm.Jellyfin, err)
 		respond(500, "Couldn't get users", gc)
@@ -1455,7 +1455,7 @@ func (app *appContext) modifyEmail(jfID string, addr string) {
 func (app *appContext) ModifyEmails(gc *gin.Context) {
 	var req modifyEmailsDTO
 	gc.BindJSON(&req)
-	users, err := app.jf.GetUsers(false)
+	users, err := app.safeGetUsers(false)
 	if err != nil {
 		app.err.Printf(lm.FailedGetUsers, lm.Jellyfin, err)
 		respond(500, "Couldn't get users", gc)
@@ -1542,7 +1542,7 @@ func (app *appContext) ApplySettings(gc *gin.Context) {
 	} else if req.From == "user" {
 		applyingFromType = lm.User
 		app.InvalidateJellyfinCache()
-		user, err := app.jf.UserByID(req.ID, false)
+		user, err := app.safeUserByID(req.ID, false)
 		if err != nil {
 			app.err.Printf(lm.FailedGetUser, req.ID, lm.Jellyfin, err)
 			respond(500, "Couldn't get user", gc)

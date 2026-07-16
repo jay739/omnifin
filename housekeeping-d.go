@@ -16,7 +16,7 @@ func (app *appContext) clearEmails() {
 	app.debug.Println(lm.HousekeepingEmail)
 	emails := app.storage.GetEmails()
 	for _, email := range emails {
-		_, err := app.jf.UserByID(email.JellyfinID, false)
+		_, err := app.safeUserByID(email.JellyfinID, false)
 		// Make sure the user doesn't exist, and no other error has occured
 		switch err.(type) {
 		case mediabrowser.ErrUserNotFound:
@@ -33,7 +33,7 @@ func (app *appContext) clearDiscord() {
 	discordUsers := app.storage.GetDiscord()
 	removeRoleOnDisable := app.config.Section("discord").Key("disable_enable_role").MustBool(false)
 	for _, discordUser := range discordUsers {
-		user, err := app.jf.UserByID(discordUser.JellyfinID, false)
+		user, err := app.safeUserByID(discordUser.JellyfinID, false)
 		// Make sure the user doesn't exist, and no other error has occured
 		switch err.(type) {
 		case mediabrowser.ErrUserNotFound:
@@ -54,7 +54,7 @@ func (app *appContext) clearMatrix() {
 	app.debug.Println(lm.HousekeepingMatrix)
 	matrixUsers := app.storage.GetMatrix()
 	for _, matrixUser := range matrixUsers {
-		_, err := app.jf.UserByID(matrixUser.JellyfinID, false)
+		_, err := app.safeUserByID(matrixUser.JellyfinID, false)
 		// Make sure the user doesn't exist, and no other error has occured
 		switch err.(type) {
 		case mediabrowser.ErrUserNotFound:
@@ -70,7 +70,7 @@ func (app *appContext) clearTelegram() {
 	app.debug.Println(lm.HousekeepingTelegram)
 	telegramUsers := app.storage.GetTelegram()
 	for _, telegramUser := range telegramUsers {
-		_, err := app.jf.UserByID(telegramUser.JellyfinID, false)
+		_, err := app.safeUserByID(telegramUser.JellyfinID, false)
 		// Make sure the user doesn't exist, and no other error has occured
 		switch err.(type) {
 		case mediabrowser.ErrUserNotFound:
