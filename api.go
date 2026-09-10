@@ -141,12 +141,12 @@ func (app *appContext) ResetSetPassword(gc *gin.Context) {
 	}
 
 	var userID, username string
-	if reset, ok := app.internalPWRs[req.PIN]; ok {
+	if reset, ok := app.getInternalPWR(req.PIN); ok {
 		isInternal = true
 		if time.Now().After(reset.Expiry) {
 			app.info.Printf(lm.FailedChangePassword, lm.Jellyfin, "?", fmt.Sprintf(lm.ExpiredPIN, reset.PIN))
 			respondBool(401, false, gc)
-			delete(app.internalPWRs, req.PIN)
+			app.deleteInternalPWR(req.PIN)
 			return
 		}
 		userID = reset.ID
@@ -158,7 +158,7 @@ func (app *appContext) ResetSetPassword(gc *gin.Context) {
 			respondBool(500, false, gc)
 			return
 		}
-		delete(app.internalPWRs, req.PIN)
+		app.deleteInternalPWR(req.PIN)
 	} else {
 		resp, err := app.jf.ResetPassword(req.PIN)
 		if err != nil || !resp.Success {

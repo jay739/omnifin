@@ -634,10 +634,7 @@ func (app *appContext) ResetMyPassword(gc *gin.Context) {
 		}
 		return
 	}
-	if app.internalPWRs == nil {
-		app.internalPWRs = map[string]InternalPWR{}
-	}
-	app.internalPWRs[pwr.PIN] = pwr
+	app.setInternalPWR(pwr)
 	// FIXME: Send to all contact methods
 	msg, err := app.email.constructReset(
 		PasswordReset{
@@ -655,9 +652,9 @@ func (app *appContext) ResetMyPassword(gc *gin.Context) {
 		}
 		return
 	} else if err := app.sendByID(msg, jfUser.ID); err != nil {
-		app.err.Printf(lm.FailedSendPWRMessage, pwr.Username, "?", err)
+		app.err.Printf(lm.FailedSendPWRMessage, pwr.Username, app.getAddressOrName(jfUser.ID), err)
 	} else {
-		app.info.Printf(lm.SentPWRMessage, pwr.Username, "?")
+		app.info.Printf(lm.SentPWRMessage, pwr.Username, app.getAddressOrName(jfUser.ID))
 	}
 	for range timerWait {
 		respondBool(204, true, gc)

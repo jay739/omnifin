@@ -334,7 +334,7 @@ func (app *appContext) ResetPassword(gc *gin.Context) {
 		"customSuccessCard": false,
 		"collectEmail":      app.config.Section("email").Key("collect").MustBool(true),
 	}
-	pwr, isInternal := app.internalPWRs[pin]
+	pwr, isInternal := app.getInternalPWR(pin)
 	// if isInternal && setPassword {
 	if setPassword {
 		data["helpMessage"] = app.config.Section("ui").Key("help_message").String()
@@ -462,6 +462,7 @@ func (app *appContext) GetCaptcha(gc *gin.Context) {
 			app.gcHTML(gc, 404, "invalidCode.html", OtherPage, "en-us", gin.H{
 				"contactMessage": app.config.Section("ui").Key("contact_message").String(),
 			})
+			return
 		}
 		if inv.Captchas != nil {
 			capt, ok = inv.Captchas[captchaID]
@@ -469,7 +470,7 @@ func (app *appContext) GetCaptcha(gc *gin.Context) {
 			ok = false
 		}
 	} else {
-		capt, ok = app.pwrCaptchas[code]
+		capt, ok = app.getPWRCaptcha(code)
 	}
 	if !ok {
 		respondBool(400, false, gc)
@@ -499,6 +500,7 @@ func (app *appContext) GenCaptcha(gc *gin.Context) {
 		app.gcHTML(gc, 404, "invalidCode.html", OtherPage, "en-us", gin.H{
 			"contactMessage": app.config.Section("ui").Key("contact_message").String(),
 		})
+		return
 	}
 	capt, err := captcha.New(300, 100)
 	if err != nil {
@@ -517,14 +519,11 @@ func (app *appContext) GenCaptcha(gc *gin.Context) {
 		return
 	}
 	if isPWR {
-		if app.pwrCaptchas == nil {
-			app.pwrCaptchas = map[string]Captcha{}
-		}
-		app.pwrCaptchas[code] = Captcha{
+		app.setPWRCaptcha(code, Captcha{
 			Answer:    capt.Text,
 			Image:     buf.Bytes(),
 			Generated: time.Now(),
-		}
+		})
 	} else {
 		inv.Captchas[captchaID] = Captcha{
 			Answer:    capt.Text,
@@ -544,24 +543,26 @@ func (app *appContext) verifyCaptcha(code, id, text string, isPWR bool) bool {
 		var c Captcha
 		ok := true
 		if !isPWR {
-			inv, ok := app.storage.GetInvitesKey(code)
-			if !ok {
+			inv, found := app.storage.GetInvitesKey(code)
+			if !found {
 				app.debug.Printf(lm.InvalidInviteCode, code)
 				return false
 			}
-			if !isPWR && inv.Captchas == nil {
+			if inv.Captchas == nil {
 				app.debug.Printf(lm.CaptchaNotFound, id, code)
 				return false
 			}
 			c, ok = inv.Captchas[id]
 		} else {
-			c, ok = app.pwrCaptchas[code]
+			c, ok = app.getPWRCaptcha(code)
 		}
-		if !ok {
+		// An unknown ID yields a zero-value Captcha, whose empty Answer would otherwise
+		// match empty submitted text and pass verification.
+		if !ok || c.Answer == "" {
 			app.debug.Printf(lm.CaptchaNotFound, id, code)
 			return false
 		}
-		return strings.ToLower(c.Answer) == strings.ToLower(text)
+		return strings.EqualFold(c.Answer, text)
 	}
 
 	// reCAPTCHA
@@ -638,7 +639,7 @@ func (app *appContext) VerifyCaptcha(gc *gin.Context) {
 			ok = false
 		}
 	} else {
-		capt, ok = app.pwrCaptchas[code]
+		capt, ok = app.getPWRCaptcha(code)
 	}
 	if !ok {
 		respondBool(400, false, gc)

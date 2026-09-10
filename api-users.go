@@ -1020,10 +1020,7 @@ func (app *appContext) AdminPasswordReset(gc *gin.Context) {
 			respondBool(500, false, gc)
 			return
 		}
-		if app.internalPWRs == nil {
-			app.internalPWRs = map[string]InternalPWR{}
-		}
-		app.internalPWRs[pwr.PIN] = pwr
+		app.setInternalPWR(pwr)
 		sendAddress := app.getAddressOrName(id)
 		if sendAddress == "" || len(req.Users) == 1 {
 			resp.Link, err = GenResetLink(pwr.PIN)
