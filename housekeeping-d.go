@@ -83,13 +83,7 @@ func (app *appContext) clearTelegram() {
 
 func (app *appContext) clearPWRCaptchas() {
 	app.debug.Println(lm.HousekeepingCaptcha)
-	captchas := map[string]Captcha{}
-	for k, capt := range app.pwrCaptchas {
-		if capt.Generated.Add(CAPTCHA_VALIDITY * time.Second).After(time.Now()) {
-			captchas[k] = capt
-		}
-	}
-	app.pwrCaptchas = captchas
+	app.prunePWRCaptchas()
 }
 
 func (app *appContext) clearActivities() {

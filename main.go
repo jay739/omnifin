@@ -141,10 +141,66 @@ type appContext struct {
 	tag                  Tag
 	update               Update
 	internalPWRs         map[string]InternalPWR
+	internalPWRsLock     sync.Mutex
 	pwrCaptchas          map[string]Captcha
+	pwrCaptchasLock      sync.Mutex
 	ConfirmationKeys     map[string]map[string]ConfirmationKey // Map of invite code to jwt to request
 	confirmationKeysLock sync.Mutex
 	userCache            *UserCache
+}
+
+// getInternalPWR returns the internal password reset stored against the given PIN.
+func (app *appContext) getInternalPWR(pin string) (InternalPWR, bool) {
+	app.internalPWRsLock.Lock()
+	defer app.internalPWRsLock.Unlock()
+	pwr, ok := app.internalPWRs[pin]
+	return pwr, ok
+}
+
+// setInternalPWR stores an internal password reset, keyed by its PIN.
+func (app *appContext) setInternalPWR(pwr InternalPWR) {
+	app.internalPWRsLock.Lock()
+	defer app.internalPWRsLock.Unlock()
+	if app.internalPWRs == nil {
+		app.internalPWRs = map[string]InternalPWR{}
+	}
+	app.internalPWRs[pwr.PIN] = pwr
+}
+
+// deleteInternalPWR removes the internal password reset stored against the given PIN.
+func (app *appContext) deleteInternalPWR(pin string) {
+	app.internalPWRsLock.Lock()
+	defer app.internalPWRsLock.Unlock()
+	delete(app.internalPWRs, pin)
+}
+
+// getPWRCaptcha returns the password reset captcha stored against the given code.
+func (app *appContext) getPWRCaptcha(code string) (Captcha, bool) {
+	app.pwrCaptchasLock.Lock()
+	defer app.pwrCaptchasLock.Unlock()
+	c, ok := app.pwrCaptchas[code]
+	return c, ok
+}
+
+// setPWRCaptcha stores a password reset captcha against the given code.
+func (app *appContext) setPWRCaptcha(code string, c Captcha) {
+	app.pwrCaptchasLock.Lock()
+	defer app.pwrCaptchasLock.Unlock()
+	if app.pwrCaptchas == nil {
+		app.pwrCaptchas = map[string]Captcha{}
+	}
+	app.pwrCaptchas[code] = c
+}
+
+// prunePWRCaptchas drops password reset captchas past their validity window.
+func (app *appContext) prunePWRCaptchas() {
+	app.pwrCaptchasLock.Lock()
+	defer app.pwrCaptchasLock.Unlock()
+	for k, capt := range app.pwrCaptchas {
+		if !capt.Generated.Add(CAPTCHA_VALIDITY * time.Second).After(time.Now()) {
+			delete(app.pwrCaptchas, k)
+		}
+	}
 }
 
 func generateSecret(length int) (string, error) {

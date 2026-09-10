@@ -103,13 +103,20 @@ func validatePWR(app *appContext, fname string, attempt int) {
 	}
 	var pwr PasswordReset
 	data, err := os.ReadFile(fname)
-	if err != nil {
-		app.debug.Printf(lm.FailedReading, fname, err)
-		return
+	if err == nil {
+		if err = json.Unmarshal(data, &pwr); err == nil && len(pwr.Pin) == 0 {
+			err = errors.New("file contained no PIN")
+		}
 	}
-	err = json.Unmarshal(data, &pwr)
-	if len(pwr.Pin) == 0 || err != nil {
-		app.debug.Printf(lm.FailedReading, fname, err)
+	if err != nil {
+		// Jellyfin may still be flushing the file when the write event fires, leaving a
+		// truncated or empty read. Retry before treating the reset as unusable.
+		if attempt < RetryCount {
+			time.Sleep(RetryInterval)
+			validatePWR(app, fname, attempt+1)
+			return
+		}
+		app.err.Printf(lm.FailedReading, fname, err)
 		return
 	}
 	app.info.Printf(lm.NewPWRForUser, pwr.Username)
@@ -123,16 +130,17 @@ func validatePWR(app *appContext, fname string, attempt int) {
 		return
 	}
 	name := app.getAddressOrName(user.ID)
-	if name != "" {
-		msg, err := app.email.constructReset(pwr, false)
-
-		if err != nil {
-			app.err.Printf(lm.FailedConstructPWRMessage, pwr.Username, err)
-		} else if err := app.sendByID(msg, user.ID); err != nil {
-			app.err.Printf(lm.FailedSendPWRMessage, pwr.Username, name, err)
-		} else {
-			app.err.Printf(lm.SentPWRMessage, pwr.Username, name)
-		}
+	if name == "" {
+		app.err.Printf(lm.NoContactMethodForPWR, pwr.Username)
+		return
+	}
+	msg, err := app.email.constructReset(pwr, false)
+	if err != nil {
+		app.err.Printf(lm.FailedConstructPWRMessage, pwr.Username, err)
+	} else if err := app.sendByID(msg, user.ID); err != nil {
+		app.err.Printf(lm.FailedSendPWRMessage, pwr.Username, name, err)
+	} else {
+		app.info.Printf(lm.SentPWRMessage, pwr.Username, name)
 	}
 }
 
