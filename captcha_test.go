@@ -64,16 +64,25 @@ func TestVerifyCaptchaPWR(t *testing.T) {
 	app := testCaptchaApp(e)
 
 	pin := shortuuid.New()
-	app.setPWRCaptcha(pin, Captcha{Answer: "123abc", Generated: time.Now()})
+	captchaID := shortuuid.New()
+	app.setPWRCaptcha(captchaID, Captcha{Answer: "123abc", Generated: time.Now()})
 
-	if !app.verifyCaptcha(pin, pin, "123ABC", true) {
+	if !app.verifyCaptcha(pin, captchaID, "123ABC", true) {
 		t.Fatal("correct PWR answer rejected")
 	}
-	if app.verifyCaptcha(pin, pin, "", true) {
+	if app.verifyCaptcha(pin, captchaID, "", true) {
 		t.Fatal("empty text accepted for a real PWR captcha")
 	}
-	if app.verifyCaptcha("no-such-pin", "no-such-pin", "", true) {
-		t.Fatal("unknown PWR code accepted with empty text")
+	if app.verifyCaptcha(pin, "no-such-id", "", true) {
+		t.Fatal("unknown PWR captcha ID accepted with empty text")
+	}
+
+	// PWR captchas used to be keyed by the reset PIN, so generating a second one
+	// overwrote the answer for the image the client was still displaying.
+	newID := shortuuid.New()
+	app.setPWRCaptcha(newID, Captcha{Answer: "xyz789", Generated: time.Now()})
+	if !app.verifyCaptcha(pin, captchaID, "123abc", true) {
+		t.Fatal("regenerating a captcha invalidated the one still on screen")
 	}
 }
 

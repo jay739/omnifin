@@ -470,7 +470,7 @@ func (app *appContext) GetCaptcha(gc *gin.Context) {
 			ok = false
 		}
 	} else {
-		capt, ok = app.getPWRCaptcha(code)
+		capt, ok = app.getPWRCaptcha(captchaID)
 	}
 	if !ok {
 		respondBool(400, false, gc)
@@ -519,7 +519,7 @@ func (app *appContext) GenCaptcha(gc *gin.Context) {
 		return
 	}
 	if isPWR {
-		app.setPWRCaptcha(code, Captcha{
+		app.setPWRCaptcha(captchaID, Captcha{
 			Answer:    capt.Text,
 			Image:     buf.Bytes(),
 			Generated: time.Now(),
@@ -554,7 +554,7 @@ func (app *appContext) verifyCaptcha(code, id, text string, isPWR bool) bool {
 			}
 			c, ok = inv.Captchas[id]
 		} else {
-			c, ok = app.getPWRCaptcha(code)
+			c, ok = app.getPWRCaptcha(id)
 		}
 		// An unknown ID yields a zero-value Captcha, whose empty Answer would otherwise
 		// match empty submitted text and pass verification.
@@ -639,7 +639,7 @@ func (app *appContext) VerifyCaptcha(gc *gin.Context) {
 			ok = false
 		}
 	} else {
-		capt, ok = app.getPWRCaptcha(code)
+		capt, ok = app.getPWRCaptcha(captchaID)
 	}
 	if !ok {
 		respondBool(400, false, gc)

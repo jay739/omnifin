@@ -78,6 +78,7 @@ var requirements = validator.requirements;
 interface sendDTO {
     pin: string;
     password: string;
+    captcha_id?: string;
     captcha_text?: string;
 }
 
@@ -99,6 +100,7 @@ form.onsubmit = (event: Event) => {
         if (window.reCAPTCHA) {
             send.captcha_text = grecaptcha.getResponse();
         } else {
+            send.captcha_id = captcha.captchaID;
             send.captcha_text = captcha.input.value;
         }
     }
