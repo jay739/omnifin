@@ -618,37 +618,43 @@ func (emailer *Emailer) send(email *Message, address ...string) error {
 	return emailer.sender.Send(emailer.fromName, emailer.fromAddr, email, address...)
 }
 
+// ErrNoContactMethod indicates a user has no contact method configured, so a
+// message could not be delivered to them by any route.
+var ErrNoContactMethod = errors.New("no email, Discord, Telegram or Matrix contact method configured")
+
 func (app *appContext) sendByID(email *Message, ID ...string) (err error) {
+	var errs []error
 	for _, id := range ID {
+		attempted := false
 		if tgChat, ok := app.storage.GetTelegramKey(id); ok && tgChat.Contact && telegramEnabled {
-			err = app.telegram.Send(email, tgChat.ChatID)
-			// if err != nil {
-			// 	return err
-			// }
+			attempted = true
+			if e := app.telegram.Send(email, tgChat.ChatID); e != nil {
+				errs = append(errs, fmt.Errorf("%s via Telegram: %w", id, e))
+			}
 		}
 		if dcChat, ok := app.storage.GetDiscordKey(id); ok && dcChat.Contact && discordEnabled {
-			err = app.discord.Send(email, dcChat.ChannelID)
-			// if err != nil {
-			// 	return err
-			// }
+			attempted = true
+			if e := app.discord.Send(email, dcChat.ChannelID); e != nil {
+				errs = append(errs, fmt.Errorf("%s via Discord: %w", id, e))
+			}
 		}
 		if mxChat, ok := app.storage.GetMatrixKey(id); ok && mxChat.Contact && matrixEnabled {
-			err = app.matrix.Send(email, mxChat)
-			// if err != nil {
-			// 	return err
-			// }
+			attempted = true
+			if e := app.matrix.Send(email, mxChat); e != nil {
+				errs = append(errs, fmt.Errorf("%s via Matrix: %w", id, e))
+			}
 		}
 		if address, ok := app.storage.GetEmailsKey(id); ok && address.Contact && emailEnabled {
-			err = app.email.send(email, address.Addr)
-			// if err != nil {
-			// 	return err
-			// }
+			attempted = true
+			if e := app.email.send(email, address.Addr); e != nil {
+				errs = append(errs, fmt.Errorf("%s via email: %w", id, e))
+			}
 		}
-		// if err != nil {
-		// 	return err
-		// }
+		if !attempted {
+			errs = append(errs, fmt.Errorf("%s: %w", id, ErrNoContactMethod))
+		}
 	}
-	return
+	return errors.Join(errs...)
 }
 
 func (app *appContext) getAddressOrName(jfID string) string {

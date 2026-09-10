@@ -389,6 +389,7 @@ const (
 	FailedConstructPWRMessage = "Failed to construct PWR message for \"%s\": %v"
 	FailedSendPWRMessage      = "Failed to send PWR message for \"%s\" to \"%s\": %v"
 	SentPWRMessage            = "Sent PWR message for \"%s\" to \"%s\""
+	NoContactMethodForPWR     = "Can't send PWR message for \"%s\": no email, Discord, Telegram or Matrix contact method is configured for them. Add one on the Accounts tab, or have them link one from their My Account page."
 
 	FailedConstructWelcomeMessage = "Failed to construct welcome message for \"%s\": %v"
 	FailedSendWelcomeMessage      = "Failed to send welcome message for \"%s\" to \"%s\": %v"
