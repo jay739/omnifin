@@ -73,12 +73,14 @@ export class Captcha {
         _get("/captcha/gen/" + this.code + (this.isPWR ? "?pwr=true" : ""), null, (req: XMLHttpRequest) => {
             if (req.readyState == 4) {
                 if (req.status == 200) {
-                    this.captchaID = this.isPWR ? this.code : req.response["id"];
-                    // the Math.random() appearance below is used for PWRs, since they don't have a unique captchaID. The parameter is ignored by the server, but tells the browser to reload the image.
+                    this.captchaID = req.response["id"];
+                    // The ID changes on every generation, so it doubles as the image cache-buster.
                     document.getElementById("captcha-img").innerHTML = `
-                <img class="w-full" src="${window.location.toString().substring(0, window.location.toString().lastIndexOf(window.pages.Form))}/captcha/img/${this.code}/${this.isPWR ? Math.random() : this.captchaID}${this.isPWR ? "?pwr=true" : ""}"></img>
+                <img class="w-full" src="${window.pages ? window.pages.Base : ""}/captcha/img/${this.code}/${this.captchaID}${this.isPWR ? "?pwr=true" : ""}"></img>
                 `;
                     this.input.value = "";
+                    this.previous = "";
+                    this.verified = false;
                 } else if (req.status !== 401 && req.status !== 403 && req.status !== 429) {
                     window.notifications.customError(
                         "captchaGenError",
