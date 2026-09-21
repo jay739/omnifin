@@ -33,7 +33,11 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
     container:
-      image: docker.io/hrfee/jfa-go-build-docker:latest
+      # Pinned by digest rather than :latest, because this container runs
+      # goreleaser with a contents:write GITHUB_TOKEN, so a mutable upstream
+      # tag could silently tamper with published artifacts. Re-pin with:
+      #   docker buildx imagetools inspect docker.io/hrfee/jfa-go-build-docker:latest
+      image: docker.io/hrfee/jfa-go-build-docker@sha256:f6967e5cdb746399773d1a5d2385ae9d0fba0d4ae81dfe7f280b987aca1f28ba
     steps:
       - uses: actions/checkout@v4
         with:
