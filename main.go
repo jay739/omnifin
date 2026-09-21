@@ -702,6 +702,21 @@ func start(asDaemon, firstCall bool) {
 		} else {
 			app.host = "0.0.0.0"
 		}
+		// Setup mode serves an unauthenticated POST /config by necessity (no
+		// credentials exist yet), so honour the same JFA_HOST/JFA_PORT override
+		// the configured path does. Without this they were silently ignored
+		// here, and a deployment setting JFA_HOST to restrict the setup bind
+		// still got 0.0.0.0.
+		if h := os.Getenv("JFA_HOST"); h != "" {
+			app.host = h
+			if p := os.Getenv("JFA_PORT"); p != "" {
+				var port int
+				_, err := fmt.Sscan(p, &port)
+				if err == nil {
+					app.port = port
+				}
+			}
+		}
 		address = fmt.Sprintf("%s:%d", app.host, app.port)
 		err := app.storage.loadLangSetup(langFS)
 		if err != nil {
