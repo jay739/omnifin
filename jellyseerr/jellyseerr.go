@@ -430,7 +430,7 @@ func (js *Jellyseerr) ModifyNotifications(jfID string, conf map[NotificationsFie
 		switch v.(type) {
 		case string:
 			conf[FieldDiscord] = []string{v.(string)}
-		}	
+		}
 	}
 	u, err := js.getUser(jfID)
 	if err != nil {
