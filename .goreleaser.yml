@@ -23,6 +23,12 @@ release:
         owner: jay739
         name: omnifin
     name_template: "v{{.Version}}"
+    # All three tag-triggered workflows target one shared GitHub Release, and
+    # desktop-release.yml (tauri-action) creates it almost immediately while
+    # goreleaser builds for ~2 minutes first. Whoever loses that race must not
+    # hard-fail: without append, goreleaser tries to claim the tag and dies with
+    # 422 already_exists, stranding the server binaries in an unpublished draft.
+    mode: append
 before:
   hooks:
     - npm ci
