@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -303,8 +304,15 @@ func buildAnnounceVars(app *appContext) map[string]string {
 	} else if srv := app.config.Section("jellyfin").Key("server").MustString(""); srv != "" {
 		vars["server_url"] = srv
 	}
-	if app.jf.ServerInfo.Name != "" {
-		vars["server_name"] = app.jf.ServerInfo.Name
+	// ServerInfo is fetched once at startup; it is empty if Jellyfin was unreachable
+	// then (slow boot), so fall back to a live lookup rather than emit an unfilled
+	// {{ server_name }} that would abort the whole send.
+	serverName := app.jf.ServerInfo.Name
+	if serverName == "" {
+		serverName = app.fetchServerName()
+	}
+	if serverName != "" {
+		vars["server_name"] = serverName
 	}
 
 	pubServer := vars["server_url"]
@@ -391,14 +399,42 @@ func (app *appContext) fetchAnnouncementStatsVars(days int) map[string]string {
 	return parsed.Vars
 }
 
+// announceVarPattern matches {{ var_name }} placeholders, tolerating any surrounding whitespace.
+var announceVarPattern = regexp.MustCompile(`\{\{\s*([A-Za-z0-9_]+)\s*\}\}`)
+
 // substituteAnnounceVars replaces {{var}} placeholders in `content` with values from `vars`.
-// Unknown placeholders are left intact so the admin can see and fix them.
+// Any placeholder without a matching variable is removed (not left intact), because
+// jfa-go's template engine treats any leftover double braces as a fatal error, so a single
+// missing or misspelled variable would otherwise abort the entire announcement send.
 func substituteAnnounceVars(content string, vars map[string]string) string {
-	out := content
-	for key, val := range vars {
-		out = strings.ReplaceAll(out, "{{"+key+"}}", val)
-		// Allow whitespace inside braces: {{ key }}
-		out = strings.ReplaceAll(out, "{{ "+key+" }}", val)
+	return announceVarPattern.ReplaceAllStringFunc(content, func(match string) string {
+		key := announceVarPattern.FindStringSubmatch(match)[1]
+		if val, ok := vars[key]; ok {
+			return val
+		}
+		return ""
+	})
+}
+
+// fetchServerName returns the Jellyfin server name with a live lookup, used when the
+// cached ServerInfo.Name is empty. Falls back to the configured email "from" name so
+// server_name is never blank.
+func (app *appContext) fetchServerName() string {
+	endpoint := fmt.Sprintf("%s/System/Info/Public", strings.TrimRight(app.jf.Server, "/"))
+	if req, err := http.NewRequest("GET", endpoint, nil); err == nil {
+		req.Header.Set("Accept", "application/json")
+		client := &http.Client{Timeout: 4 * time.Second}
+		if resp, err := client.Do(req); err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == 200 {
+				var info struct {
+					ServerName string `json:"ServerName"`
+				}
+				if json.NewDecoder(resp.Body).Decode(&info) == nil && info.ServerName != "" {
+					return info.ServerName
+				}
+			}
+		}
 	}
-	return out
+	return app.config.Section("email").Key("from").MustString("")
 }
