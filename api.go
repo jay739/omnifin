@@ -134,7 +134,7 @@ func (app *appContext) ResetSetPassword(gc *gin.Context) {
 	}
 	isInternal := false
 
-	if captcha && !app.verifyCaptcha(req.PIN, req.PIN, req.CaptchaText, true) {
+	if captcha && !app.verifyCaptcha(req.PIN, req.CaptchaID, req.CaptchaText, true) {
 		app.info.Printf(lm.FailedChangePassword, lm.Jellyfin, "?", lm.IncorrectCaptcha)
 		respond(400, "errorCaptcha", gc)
 		return
