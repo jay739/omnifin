@@ -898,7 +898,7 @@ func (app *appContext) GetAnnounceFiles(gc *gin.Context) {
 	dir := app.announcementsDir()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		// Directory missing or unreadable — return empty list, not an error.
+		// Return an empty list when the directory is missing or unreadable.
 		gc.JSON(200, out)
 		return
 	}
@@ -976,6 +976,7 @@ func (app *appContext) GetAnnounceFile(gc *gin.Context) {
 // @Produce json
 // @Success 200 {object} boolResponse
 // @Failure 400 {object} boolResponse
+// @Failure 404 {object} boolResponse
 // @Failure 500 {object} boolResponse
 // @Param name path string true "name of template (url encoded if necessary)"
 // @Router /users/announce/template/{name} [delete]
@@ -988,8 +989,15 @@ func (app *appContext) DeleteAnnounceTemplate(gc *gin.Context) {
 		respondBool(400, false, gc)
 		return
 	}
-	app.storage.DeleteAnnouncementsKey(name)
-	respondBool(200, false, gc)
+	if err := app.storage.DeleteAnnouncementsKey(name); err != nil {
+		if err == badgerhold.ErrNotFound {
+			respondBool(404, false, gc)
+		} else {
+			respondBool(500, false, gc)
+		}
+		return
+	}
+	respondBool(200, true, gc)
 }
 
 // @Summary Generate password reset links for a list of users, sending the links to them if possible.

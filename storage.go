@@ -432,9 +432,9 @@ func (st *Storage) SetAnnouncementsKey(k string, v announcementTemplate) {
 }
 
 // DeleteAnnouncementsKey deletes value at key k.
-func (st *Storage) DeleteAnnouncementsKey(k string) {
+func (st *Storage) DeleteAnnouncementsKey(k string) error {
 	st.DebugWatch(StoredAnnouncements, k, "")
-	st.db.Delete(k, announcementTemplate{})
+	return st.db.Delete(k, announcementTemplate{})
 }
 
 // GetUserExpiries returns a copy of the store.
