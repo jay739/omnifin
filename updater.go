@@ -213,10 +213,13 @@ func (ud *Updater) GetTag() (Tag, int, error) {
 	req, _ := http.NewRequest("GET", url, nil)
 	resp, err := ud.httpClient.Do(req)
 	defer ud.timeoutHandler()
-	if err != nil || resp.StatusCode != 200 {
-		return Tag{}, resp.StatusCode, err
+	if err != nil {
+		return Tag{}, -1, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return Tag{}, resp.StatusCode, fmt.Errorf("update tag request returned HTTP %d", resp.StatusCode)
+	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return Tag{}, -1, err
@@ -240,12 +243,15 @@ func (ud *Updater) getRelease() (release GHRelease, status int, err error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", ud.namespace, ud.name)
 	req, _ := http.NewRequest("GET", url, nil)
 	resp, err := ud.httpClient.Do(req)
-	status = resp.StatusCode
 	defer ud.timeoutHandler()
-	if err != nil || resp.StatusCode != 200 {
-		return
+	if err != nil {
+		return release, -1, err
 	}
 	defer resp.Body.Close()
+	status = resp.StatusCode
+	if status != http.StatusOK {
+		return release, status, fmt.Errorf("release request returned HTTP %d", status)
+	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return
