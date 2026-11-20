@@ -104,8 +104,6 @@ func (app *appContext) checkUsers(remindBeforeExpiry *DayTimerSet) {
 				app.debug.Printf("Checking for expiry reminder timers")
 				duration := remindBeforeExpiry.Check(expiry.Expiry, expiry.LastNotified)
 				if duration != 0 {
-					expiry.LastNotified = time.Now()
-					app.storage.SetUserExpiryKey(user.ID, expiry)
 					name := app.getAddressOrName(user.ID)
 					// Skip blank contact info
 					if name == "" {
@@ -117,6 +115,8 @@ func (app *appContext) checkUsers(remindBeforeExpiry *DayTimerSet) {
 					} else if err := app.sendByID(msg, user.ID); err != nil {
 						app.err.Printf(lm.FailedSendExpiryReminderMessage, user.ID, name, err)
 					} else {
+						expiry.LastNotified = time.Now()
+						app.storage.SetUserExpiryKey(user.ID, expiry)
 						app.info.Printf(lm.SentExpiryReminderMessage, user.ID, name)
 					}
 				}
