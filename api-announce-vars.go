@@ -439,3 +439,13 @@ func (app *appContext) fetchServerName() string {
 	}
 	return app.config.Section("email").Key("from").MustString("")
 }
+
+// expandAnnouncementGlobals resolves composer variables before recipient rendering.
+// Plain messages and already-filled file templates need no upstream lookups.
+func (app *appContext) expandAnnouncementGlobals(subject, message string) (string, string) {
+	if !announceVarPattern.MatchString(subject) && !announceVarPattern.MatchString(message) {
+		return subject, message
+	}
+	vars := buildAnnounceVars(app)
+	return substituteAnnounceVars(subject, vars), substituteAnnounceVars(message, vars)
+}

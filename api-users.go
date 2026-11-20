@@ -759,6 +759,7 @@ func (app *appContext) Announce(gc *gin.Context) {
 		}
 		req.Users = []string{adminID}
 	}
+	req.Subject, req.Message = app.expandAnnouncementGlobals(req.Subject, req.Message)
 	// Generally, we only need to construct once. If {username} is included, however, this needs to be done for each user.
 	unique := strings.Contains(req.Message, "{username}")
 	if unique {
