@@ -759,6 +759,7 @@ func (app *appContext) Announce(gc *gin.Context) {
 		}
 		req.Users = []string{adminID}
 	}
+	req.Subject, req.Message = app.expandAnnouncementGlobals(req.Subject, req.Message)
 	// Generally, we only need to construct once. If {username} is included, however, this needs to be done for each user.
 	unique := strings.Contains(req.Message, "{username}")
 	if unique {
@@ -898,7 +899,7 @@ func (app *appContext) GetAnnounceFiles(gc *gin.Context) {
 	dir := app.announcementsDir()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		// Directory missing or unreadable — return empty list, not an error.
+		// Return an empty list when the directory is missing or unreadable.
 		gc.JSON(200, out)
 		return
 	}

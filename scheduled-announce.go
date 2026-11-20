@@ -140,10 +140,11 @@ func scheduledAnnounceJob(app *appContext) {
 	}
 	for _, s := range due {
 		app.debug.Printf("scheduled announce daemon: dispatching %s (%d users)", s.ID, len(s.Users))
-		// Use the same path as the live Announce handler.
-		msg, err := app.email.construct(AnnouncementCustomContent(s.Subject), CustomContent{
+		// Expand global variables at delivery time, as for immediate announcements.
+		subject, message := app.expandAnnouncementGlobals(s.Subject, s.Message)
+		msg, err := app.email.construct(AnnouncementCustomContent(subject), CustomContent{
 			Enabled: true,
-			Content: s.Message,
+			Content: message,
 		}, map[string]any{"username": ""})
 		if err != nil {
 			app.err.Printf("scheduled announce: construct failed for %s: %v", s.ID, err)
