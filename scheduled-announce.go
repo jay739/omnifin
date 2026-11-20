@@ -1,7 +1,10 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -142,15 +145,7 @@ func scheduledAnnounceJob(app *appContext) {
 		app.debug.Printf("scheduled announce daemon: dispatching %s (%d users)", s.ID, len(s.Users))
 		// Expand global variables at delivery time, as for immediate announcements.
 		subject, message := app.expandAnnouncementGlobals(s.Subject, s.Message)
-		msg, err := app.email.construct(AnnouncementCustomContent(subject), CustomContent{
-			Enabled: true,
-			Content: message,
-		}, map[string]any{"username": ""})
-		if err != nil {
-			app.err.Printf("scheduled announce: construct failed for %s: %v", s.ID, err)
-			continue
-		}
-		if err := app.sendByID(msg, s.Users...); err != nil {
+		if err := app.sendScheduledAnnouncement(subject, message, s.Users); err != nil {
 			app.err.Printf("scheduled announce: send failed for %s: %v", s.ID, err)
 			continue
 		}
@@ -166,4 +161,35 @@ func newScheduledAnnounceDaemon(app *appContext) *GenericDaemon {
 	d := NewGenericDaemon(60*time.Second, app, scheduledAnnounceJob)
 	d.Name("Scheduled Announcements")
 	return d
+}
+
+// sendScheduledAnnouncement constructs recipient-specific messages when needed.
+func (app *appContext) sendScheduledAnnouncement(subject, message string, users []string) error {
+	construct := func(username string) (*Message, error) {
+		return app.email.construct(AnnouncementCustomContent(subject), CustomContent{Enabled: true, Content: message}, map[string]any{"username": username})
+	}
+	if !strings.Contains(subject, "{username}") && !strings.Contains(message, "{username}") {
+		msg, err := construct("")
+		if err != nil {
+			return err
+		}
+		return app.sendByID(msg, users...)
+	}
+	var failures []error
+	for _, id := range users {
+		user, err := app.safeUserByID(id, false)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("lookup recipient %s: %w", id, err))
+			continue
+		}
+		msg, err := construct(user.Name)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("render recipient %s: %w", id, err))
+			continue
+		}
+		if err := app.sendByID(msg, id); err != nil {
+			failures = append(failures, err)
+		}
+	}
+	return errors.Join(failures...)
 }
