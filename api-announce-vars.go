@@ -90,7 +90,7 @@ func renderItemList(items []jfLatestItem) string {
 			b.WriteString(fmt.Sprintf(" (%d)", item.ProductionYear))
 		}
 		if item.CommunityRating > 0 {
-			b.WriteString(fmt.Sprintf(" — ⭐ %.1f", item.CommunityRating))
+			b.WriteString(fmt.Sprintf(", ⭐ %.1f", item.CommunityRating))
 		}
 		b.WriteString("\n")
 	}
@@ -250,8 +250,9 @@ func renderFeaturedCard(item jfLatestItem, publicServer string) string {
 	var overviewHTML string
 	if item.Overview != "" {
 		ov := item.Overview
-		if len(ov) > 220 {
-			ov = ov[:220] + "…"
+		runes := []rune(ov)
+		if len(runes) > 220 {
+			ov = string(runes[:220]) + "…"
 		}
 		overviewHTML = fmt.Sprintf(`<p style="font-size:13px;line-height:1.6;color:#9ca3af;margin:10px 0 0;">%s</p>`, html.EscapeString(ov))
 	}
