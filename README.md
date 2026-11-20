@@ -50,7 +50,18 @@ Plus Jellystat-backed analytics (pulled from a sidecar `jellyfin-stats-api` serv
 | `{{top_clients_30d}}` | Most-used Jellyfin client apps |
 | `{{watch_plays_30d}}` / `{{watch_time_30d}}` / `{{active_watchers_30d}}` | Headline numbers |
 
-The **announcement preview** in the admin panel live-substitutes all variables, including poster images, so you see the final rendered result before sending.
+The **announcement preview** in the admin panel substitutes shared variables, including poster images. Recipient fields are resolved separately for each selected user during delivery.
+
+Use single braces for recipient fields in either the subject or message body:
+
+| Field | Output |
+|---|---|
+| `{username}` | The recipient's Jellyfin username |
+| `{last_login}` | The recipient's Jellyfin last-login date and time, including seconds, timezone, and UTC offset |
+
+For example, `Your last login was {last_login}.` works in immediate, test, and scheduled announcements. Dates use the Omnifin server's local timezone, controlled by its timezone configuration. Accounts without a recorded login display `No login recorded`.
+
+Last login records authentication time, which differs from last playback or activity. This field supplies a timestamp and does not automatically select or suspend accounts after six months.
 
 ### Smart user selection
 

@@ -761,7 +761,7 @@ func (app *appContext) Announce(gc *gin.Context) {
 	}
 	req.Subject, req.Message = app.expandAnnouncementGlobals(req.Subject, req.Message)
 	// Personalize when either the subject or body contains a recipient field.
-	unique := strings.Contains(req.Subject, "{username}") || strings.Contains(req.Message, "{username}")
+	unique := announcementNeedsRecipient(req.Subject, req.Message)
 	if unique {
 		for _, userID := range req.Users {
 			user, err := app.safeUserByID(userID, false)
@@ -772,7 +772,7 @@ func (app *appContext) Announce(gc *gin.Context) {
 			msg, err := app.email.construct(AnnouncementCustomContent(req.Subject), CustomContent{
 				Enabled: true,
 				Content: req.Message,
-			}, map[string]any{"username": user.Name})
+			}, announcementRecipientValues(user))
 			if err != nil {
 				app.err.Printf(lm.FailedConstructAnnouncementMessage, userID, err)
 				respondAPIError(500, "errorAnnounceConstruct", "ANNOUNCE_TEMPLATE", err.Error(), gc)

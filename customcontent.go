@@ -400,8 +400,8 @@ var EmptyCustomContent = CustomContentInfo{
 var AnnouncementCustomContent = func(subject string) CustomContentInfo {
 	cci := EmptyCustomContent
 	cci.Subject = func(config *Config, lang *emailLang) string { return subject }
-	cci.Variables = defaultVars()
-	cci.Placeholders = defaultVals(map[string]any{})
+	cci.Variables = defaultVars("last_login")
+	cci.Placeholders = defaultVals(map[string]any{"last_login": "Last recorded Jellyfin login"})
 	return cci
 }
 

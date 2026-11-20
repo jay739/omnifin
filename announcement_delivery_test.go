@@ -93,7 +93,7 @@ func newAnnouncementDeliveryFixture(t *testing.T) (*appContext, *announcementCap
 		case "/system/info/public":
 			_, _ = w.Write([]byte(`{"ServerName":"Fixture server"}`))
 		case "/users":
-			_, _ = w.Write([]byte(`[{"Id":"00000000000000000000000000000001","Name":"Alice"},{"Id":"00000000000000000000000000000002","Name":"Bob"}]`))
+			_, _ = w.Write([]byte(`[{"Id":"00000000000000000000000000000001","Name":"Alice","LastLoginDate":"2026-01-01T15:30:45Z"},{"Id":"00000000000000000000000000000002","Name":"Bob","LastLoginDate":"2026-05-02T16:45:30Z"},{"Id":"00000000000000000000000000000003","Name":"Charlie"}]`))
 		case "/api/announcement-summary":
 			_, _ = w.Write([]byte(`{"vars":{"watch_plays_30d":"42"}}`))
 		default:
@@ -113,6 +113,7 @@ func newAnnouncementDeliveryFixture(t *testing.T) (*appContext, *announcementCap
 	e.sender = capture
 	app.storage.SetEmailsKey("00000000000000000000000000000001", EmailAddress{Addr: "alice@example.invalid", Contact: true})
 	app.storage.SetEmailsKey("00000000000000000000000000000002", EmailAddress{Addr: "bob@example.invalid", Contact: true})
+	app.storage.SetEmailsKey("00000000000000000000000000000003", EmailAddress{Addr: "charlie@example.invalid", Contact: true})
 	return app, capture
 }
 
@@ -175,5 +176,66 @@ func TestImmediateAnnouncementPersonalizesSubjectWithoutBodyField(t *testing.T) 
 		if name == "" || message.Subject != "Notice for "+name || !strings.Contains(message.Text, "Please sign in.") {
 			t.Fatalf("incorrect recipient content: subject=%q text=%q", message.Subject, message.Text)
 		}
+	}
+}
+
+func TestAnnouncementLastLoginPerRecipient(t *testing.T) {
+	zone, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldLocal := time.Local
+	time.Local = zone
+	t.Cleanup(func() { time.Local = oldLocal })
+	for _, mode := range []string{"immediate", "test", "scheduled"} {
+		t.Run(mode, func(t *testing.T) {
+			app, capture := newAnnouncementDeliveryFixture(t)
+			ids := []string{"00000000000000000000000000000001", "00000000000000000000000000000002", "00000000000000000000000000000003"}
+			subject, body := "Last login: {last_login}", "Seen {last_login}"
+			if mode != "scheduled" {
+				payload, err := json.Marshal(announcementDTO{Users: ids, Subject: subject, Message: body, Test: mode == "test"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				router := gin.New()
+				router.POST("/users/announce", func(c *gin.Context) {
+					if mode == "test" {
+						c.Set("jfId", ids[0])
+					}
+					app.Announce(c)
+				})
+				response := httptest.NewRecorder()
+				request := httptest.NewRequest(http.MethodPost, "/users/announce", bytes.NewReader(payload))
+				request.Header.Set("Content-Type", "application/json")
+				router.ServeHTTP(response, request)
+				if response.Code != http.StatusOK {
+					t.Fatalf("status = %d: %s", response.Code, response.Body.String())
+				}
+			} else {
+				job := ScheduledAnnouncement{ID: "last-login", Users: ids, Subject: subject, Message: body, SendAt: time.Now().Add(-time.Minute)}
+				if err := app.storage.db.Insert(job.ID, job); err != nil {
+					t.Fatal(err)
+				}
+				scheduledAnnounceJob(app)
+			}
+			wantCount := 3
+			if mode == "test" {
+				wantCount = 1
+			}
+			if len(capture.messages) != wantCount {
+				t.Fatalf("sent %d messages, want %d", len(capture.messages), wantCount)
+			}
+			expected := map[string]string{
+				"alice@example.invalid":   "January 1, 2026 at 10:30:45 AM EST (UTC-05:00)",
+				"bob@example.invalid":     "May 2, 2026 at 12:45:30 PM EDT (UTC-04:00)",
+				"charlie@example.invalid": "No login recorded",
+			}
+			for i, message := range capture.messages {
+				value := expected[capture.addresses[i][0]]
+				if value == "" || message.Subject != "Last login: "+value || !strings.Contains(message.Text, "Seen "+value) {
+					t.Fatalf("incorrect login timestamp: subject=%q text=%q", message.Subject, message.Text)
+				}
+			}
+		})
 	}
 }

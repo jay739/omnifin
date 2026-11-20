@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -165,11 +164,11 @@ func newScheduledAnnounceDaemon(app *appContext) *GenericDaemon {
 
 // sendScheduledAnnouncement constructs recipient-specific messages when needed.
 func (app *appContext) sendScheduledAnnouncement(subject, message string, users []string) error {
-	construct := func(username string) (*Message, error) {
-		return app.email.construct(AnnouncementCustomContent(subject), CustomContent{Enabled: true, Content: message}, map[string]any{"username": username})
+	construct := func(values map[string]any) (*Message, error) {
+		return app.email.construct(AnnouncementCustomContent(subject), CustomContent{Enabled: true, Content: message}, values)
 	}
-	if !strings.Contains(subject, "{username}") && !strings.Contains(message, "{username}") {
-		msg, err := construct("")
+	if !announcementNeedsRecipient(subject, message) {
+		msg, err := construct(map[string]any{"username": ""})
 		if err != nil {
 			return err
 		}
@@ -182,7 +181,7 @@ func (app *appContext) sendScheduledAnnouncement(subject, message string, users 
 			failures = append(failures, fmt.Errorf("lookup recipient %s: %w", id, err))
 			continue
 		}
-		msg, err := construct(user.Name)
+		msg, err := construct(announcementRecipientValues(user))
 		if err != nil {
 			failures = append(failures, fmt.Errorf("render recipient %s: %w", id, err))
 			continue
