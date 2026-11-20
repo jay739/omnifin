@@ -94,6 +94,9 @@ func newAnnouncementDeliveryFixture(t *testing.T) (*appContext, *announcementCap
 			_, _ = w.Write([]byte(`{"ServerName":"Fixture server"}`))
 		case "/users":
 			_, _ = w.Write([]byte(`[{"Id":"00000000000000000000000000000001","Name":"Alice","LastLoginDate":"2026-01-01T15:30:45Z"},{"Id":"00000000000000000000000000000002","Name":"Bob","LastLoginDate":"2026-05-02T16:45:30Z"},{"Id":"00000000000000000000000000000003","Name":"Charlie"}]`))
+		case "/users/ffffffffffffffffffffffffffffffff":
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`"User not found"`))
 		case "/api/announcement-summary":
 			_, _ = w.Write([]byte(`{"vars":{"watch_plays_30d":"42"}}`))
 		default:
@@ -235,6 +238,54 @@ func TestAnnouncementLastLoginPerRecipient(t *testing.T) {
 				if value == "" || message.Subject != "Last login: "+value || !strings.Contains(message.Text, "Seen "+value) {
 					t.Fatalf("incorrect login timestamp: subject=%q text=%q", message.Subject, message.Text)
 				}
+			}
+		})
+	}
+}
+
+func TestAnnouncementReportsRecipientLookupFailures(t *testing.T) {
+	missing := "ffffffffffffffffffffffffffffffff"
+	alice := "00000000000000000000000000000001"
+	for _, tc := range []struct {
+		name     string
+		users    []string
+		wantSent int
+	}{
+		{name: "all recipients missing", users: []string{missing}},
+		{name: "partial delivery", users: []string{alice, missing}, wantSent: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app, capture := newAnnouncementDeliveryFixture(t)
+			payload, err := json.Marshal(announcementDTO{Users: tc.users, Subject: "Notice", Message: "Hi {username}!"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			router := gin.New()
+			router.POST("/users/announce", app.Announce)
+			response := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/users/announce", bytes.NewReader(payload))
+			request.Header.Set("Content-Type", "application/json")
+			router.ServeHTTP(response, request)
+			if response.Code != http.StatusBadGateway {
+				t.Fatalf("status = %d, want 502: %s", response.Code, response.Body.String())
+			}
+			var result struct {
+				Success     bool     `json:"success"`
+				Code        string   `json:"code"`
+				SentUsers   []string `json:"sent_users"`
+				FailedUsers []string `json:"failed_users"`
+			}
+			if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+				t.Fatal(err)
+			}
+			if result.Success || result.Code != "ANNOUNCE_RECIPIENT_LOOKUP" || len(result.SentUsers) != tc.wantSent || len(result.FailedUsers) != 1 || result.FailedUsers[0] != missing {
+				t.Fatalf("incorrect delivery result: %+v", result)
+			}
+			if len(capture.messages) != tc.wantSent {
+				t.Fatalf("captured %d deliveries, want %d", len(capture.messages), tc.wantSent)
+			}
+			if tc.wantSent == 1 && result.SentUsers[0] != alice {
+				t.Fatalf("incorrect delivered recipient: %v", result.SentUsers)
 			}
 		})
 	}

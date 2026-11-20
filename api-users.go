@@ -737,6 +737,7 @@ func (app *appContext) DisableReferralForUsers(gc *gin.Context) {
 // @Success 200 {object} boolResponse
 // @Failure 400 {object} boolResponse
 // @Failure 500 {object} boolResponse
+// @Failure 502 {object} apiErrorBody
 // @Router /users/announce [post]
 // @Security Bearer
 // @tags Users
@@ -763,10 +764,13 @@ func (app *appContext) Announce(gc *gin.Context) {
 	// Personalize when either the subject or body contains a recipient field.
 	unique := announcementNeedsRecipient(req.Subject, req.Message)
 	if unique {
+		sentUsers := []string{}
+		failedUsers := []string{}
 		for _, userID := range req.Users {
 			user, err := app.safeUserByID(userID, false)
 			if err != nil {
 				app.err.Printf(lm.FailedGetUser, userID, lm.Jellyfin, err)
+				failedUsers = append(failedUsers, userID)
 				continue
 			}
 			msg, err := app.email.construct(AnnouncementCustomContent(req.Subject), CustomContent{
@@ -782,6 +786,18 @@ func (app *appContext) Announce(gc *gin.Context) {
 				respondAPIError(500, "errorAnnounceSend", "ANNOUNCE_SEND", err.Error(), gc)
 				return
 			}
+			sentUsers = append(sentUsers, userID)
+		}
+		if len(failedUsers) > 0 {
+			gc.JSON(502, gin.H{
+				"error":        "errorAnnounceSend",
+				"code":         "ANNOUNCE_RECIPIENT_LOOKUP",
+				"hint":         fmt.Sprintf("Sent to %d of %d selected recipients; %d could not be looked up. Retry only the failed recipients.", len(sentUsers), len(req.Users), len(failedUsers)),
+				"sent_users":   sentUsers,
+				"failed_users": failedUsers,
+			})
+			gc.Abort()
+			return
 		}
 		// app.info.Printf(lm.SentAnnouncementMessage, "*", "?")
 	} else {

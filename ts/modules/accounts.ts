@@ -1596,7 +1596,7 @@ export class accountsList extends PaginatedList implements Navigatable, AsTab {
             }
             try {
                 localStorage.setItem(draftKey, JSON.stringify({ subject: subj, body, ts: Date.now() }));
-            } catch { /* quota exceeded — silently skip */ }
+            } catch { /* quota exceeded; silently skip */ }
         };
         const restoreDraft = () => {
             const raw = localStorage.getItem(draftKey);
@@ -2230,9 +2230,9 @@ export class accountsList extends PaginatedList implements Navigatable, AsTab {
                         document.dispatchEvent(new CustomEvent("announcement-sent"));
                     }
                 }
-            });
+            }, true);
         };
-        // Wire "Send test to me" — POSTs with test=true so the server delivers only to the logged-in admin.
+        // Wire "Send test to me": POSTs with test=true so the server delivers only to the logged-in admin.
         const testButton = document.getElementById("test-announce") as HTMLSpanElement;
         if (testButton) {
             testButton.onclick = () => {
@@ -2255,7 +2255,7 @@ export class accountsList extends PaginatedList implements Navigatable, AsTab {
                     if (req.status != 200 && req.status != 204) {
                         window.notifications.customError(
                             "announceTestError",
-                            formatApiFailure(req, "Test send failed — check logs."),
+                            formatApiFailure(req, "Test send failed. Check logs."),
                         );
                     } else {
                         window.notifications.customSuccess(
@@ -2263,7 +2263,7 @@ export class accountsList extends PaginatedList implements Navigatable, AsTab {
                             "Test announcement sent to your account.",
                         );
                     }
-                });
+                }, true);
             };
         }
         _get("/config/emails/Announcement", null, (req: XMLHttpRequest) => {
