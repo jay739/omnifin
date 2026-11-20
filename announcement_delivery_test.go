@@ -147,3 +147,33 @@ func TestScheduledAnnouncementsPersonalizeEachRecipient(t *testing.T) {
 		t.Fatal("completed job remains pending")
 	}
 }
+
+func TestImmediateAnnouncementPersonalizesSubjectWithoutBodyField(t *testing.T) {
+	app, capture := newAnnouncementDeliveryFixture(t)
+	payload, err := json.Marshal(announcementDTO{
+		Users:   []string{"00000000000000000000000000000001", "00000000000000000000000000000002"},
+		Subject: "Notice for {username}", Message: "Please sign in.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	router := gin.New()
+	router.POST("/users/announce", app.Announce)
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/users/announce", bytes.NewReader(payload))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", response.Code, response.Body.String())
+	}
+	if len(capture.messages) != 2 {
+		t.Fatalf("sent %d messages, want 2", len(capture.messages))
+	}
+	names := map[string]string{"alice@example.invalid": "Alice", "bob@example.invalid": "Bob"}
+	for i, message := range capture.messages {
+		name := names[capture.addresses[i][0]]
+		if name == "" || message.Subject != "Notice for "+name || !strings.Contains(message.Text, "Please sign in.") {
+			t.Fatalf("incorrect recipient content: subject=%q text=%q", message.Subject, message.Text)
+		}
+	}
+}
