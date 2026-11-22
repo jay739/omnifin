@@ -78,6 +78,8 @@ The selection then plugs into any existing bulk action, most useful for sending 
 
 The announce modal has a **"Send at"** datetime picker. Leave blank to send now (original behaviour); fill with a future time to queue the announcement. A background daemon polls every 60s, dispatches due items via the same multi-channel pipeline (email/Telegram/Discord/Matrix), and marks them sent. Queue persists across restarts.
 
+Scheduled jobs record delivery outcomes per recipient and channel. Acknowledged sends are skipped on retry; remaining failures retry after 1, 2, 4, and 8 minutes, stopping after five attempts. The queue API exposes attempts, the next retry time, errors, and channel outcomes. If an interrupted attempt has no recorded outcome, the job stops for review rather than automatically replaying it. Verify the delivery outcome before creating a replacement job.
+
 ### Activity-based expiry auto-extension
 
 Opt-in via `[user_expiry] auto_extend_on_activity = true`. When a user with a stored expiry has logged into Jellyfin recently and their expiry is approaching, the user daemon automatically pushes it out. Tunable: `auto_extend_if_active_within_days` (default 7), `auto_extend_window_days` (default 14), `auto_extend_by_days` (default 30). Fires the `expiry_extended` webhook.
