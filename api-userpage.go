@@ -141,7 +141,7 @@ func (app *appContext) LogoutUser(gc *gin.Context) {
 		return
 	}
 	app.invalidTokens = append(app.invalidTokens, cookie)
-	gc.SetCookie("refresh", "invalid", -1, "/my", gc.Request.URL.Hostname(), true, true)
+	gc.SetCookie("user-refresh", "invalid", -1, "/my", app.ExternalDomainNoPort(gc), true, true)
 	respondBool(200, true, gc)
 }
 
