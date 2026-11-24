@@ -87,6 +87,9 @@ func (c *UserCache) MaybeSync(app *appContext) error {
 				status <- err
 				return
 			}
+			if saveErr := app.saveUserDirectory(users); saveErr != nil {
+				app.err.Printf("Could not save user directory for offline use: %v", saveErr)
+			}
 			startTime := time.Now()
 			cache := make([]respUser, len(users))
 			labels := map[string]bool{}
@@ -170,22 +173,21 @@ func (c *UserCache) MaybeSync(app *appContext) error {
 
 func (c *UserCache) GetUserDTOs(app *appContext, sorted bool) ([]*respUser, error) {
 	if err := c.MaybeSync(app); err != nil {
-		// Fall back to the last successfully-synced cache instead of
-		// returning nothing, if we have one. MaybeSync's own comment already
-		// documents this as the intended behavior for a background sync
-		// failure ("expecting you to use the old cache data"), but a
-		// blocking sync failure (Jellyfin down long enough that
-		// WaitForSyncTimeout elapsed) was falling through this same error
-		// path and discarding c.Ref too. Found live 2026-07-16: with
-		// Jellyfin stopped, GetUsers/SearchUsers returned a plain 500
-		// instead of the last known user list, which is exactly the data
-		// needed to send maintenance/downtime notices to users while
-		// Jellyfin itself is unreachable.
-		if len(c.Ref) > 0 {
-			app.err.Printf(lm.FailedGetUsers, lm.Jellyfin, fmt.Errorf("serving stale cache from %s, sync failed: %w", c.LastSync.Format(time.RFC3339), err))
-			return c.Ref, nil
+		users, syncedAt, loadErr := app.savedUserDirectory()
+		if loadErr != nil {
+			return nil, fmt.Errorf("Jellyfin sync failed: %v; %w", err, loadErr)
 		}
-		return nil, err
+		// Rebuild summaries from current local contacts and settings so an
+		// offline email-address or preference edit is immediately reflected.
+		c.Cache = make([]respUser, len(users))
+		c.Ref = make([]*respUser, len(users))
+		for i, user := range users {
+			c.Cache[i] = app.GetUserSummary(user)
+			c.Ref[i] = &c.Cache[i]
+		}
+		c.LastSync = syncedAt
+		c.Sorted = false
+		app.err.Printf("Jellyfin unavailable; listing saved users from %s: %v", syncedAt.Format(time.RFC3339), err)
 	}
 	if sorted && !c.Sorted {
 		c.SortLock.Lock()

@@ -232,14 +232,18 @@ func (app *appContext) sendScheduledAnnouncement(subject, message string, job *S
 		}
 		return errors.Join(failures...)
 	}
+	recipients, err := app.announcementDirectory()
+	if err != nil {
+		return err
+	}
 	var failures []error
 	for _, id := range job.Users {
-		user, err := app.safeUserByID(id, false)
-		if err != nil {
-			failures = append(failures, fmt.Errorf("lookup recipient %s: %w", id, err))
+		values, found := recipients[id]
+		if !found {
+			failures = append(failures, fmt.Errorf("lookup recipient %s: no saved or current user", id))
 			continue
 		}
-		msg, err := construct(announcementRecipientValues(user))
+		msg, err := construct(values)
 		if err != nil {
 			failures = append(failures, fmt.Errorf("render recipient %s: %w", id, err))
 			continue
