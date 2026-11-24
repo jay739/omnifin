@@ -3,16 +3,8 @@ name: CI - build and test
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - '.github/workflows/**'
-      - '**/*.md'
-      - 'docs/**'
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '.github/workflows/**'
-      - '**/*.md'
-      - 'docs/**'
 
 # Principle of least privilege: this workflow only needs to read the repo to
 # build + test. No write access to issues, PRs, packages, deployments, etc.
@@ -20,7 +12,47 @@ permissions:
   contents: read
 
 jobs:
+  # Skip the build job for documentation that does not feed the build.
+  # LICENSE is copied into build assets, so changes to it count as code.
+  # A job-level condition preserves the required check for docs-only PRs.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          # No usable base (manual run, new branch, rewritten history): build.
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$base" HEAD)
+          echo "Changed files:"
+          echo "$changed"
+          docs='^(.*\.md|LICENSE.*|\.github/(ISSUE_TEMPLATE|DISCUSSION_TEMPLATE)/.*|docs/.*\.(svg|png|jpe?g|gif|webp|ico|html|css))$'
+          keep='^LICENSE$'
+          code_files=$( { echo "$changed" | grep -vE "$docs"; [ -n "$keep" ] && echo "$changed" | grep -E "$keep"; } | grep -c . || true)
+          if [ "$code_files" -gt 0 ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Docs-only change: skipping the build and test jobs."
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build-and-test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
