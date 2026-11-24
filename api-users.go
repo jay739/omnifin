@@ -56,6 +56,8 @@ func (app *appContext) NewUserFromAdmin(gc *gin.Context) {
 	})
 	if !nu.Success {
 		nu.Log()
+		respondUser(nu.Status, nu.Created, true, nu.Message, gc)
+		return
 	}
 
 	var emailStore *EmailAddress = nil
