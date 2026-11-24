@@ -2168,10 +2168,11 @@ export class accountsList extends PaginatedList implements Navigatable, AsTab {
             subject.value = "";
             this._announceTextarea.value = "";
         }
+        const scheduleInput = document.getElementById("announce-schedule-at") as HTMLInputElement | null;
+        if (scheduleInput) scheduleInput.value = "";
         form.onsubmit = (event: Event) => {
             event.preventDefault();
             toggleLoader(button);
-            const scheduleInput = document.getElementById("announce-schedule-at") as HTMLInputElement | null;
             const scheduleVal = scheduleInput?.value || "";
             // If a future datetime was picked, POST to the scheduled endpoint instead of sending immediately.
             if (scheduleVal) {
