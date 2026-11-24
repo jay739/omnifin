@@ -63,6 +63,18 @@ For example, `Your last login was {last_login}.` works in immediate, test, and s
 
 Last login records authentication time, which differs from last playback or activity. This field supplies a timestamp and does not automatically select or suspend accounts after six months.
 
+### Administrator access during a Jellyfin outage
+
+For administrator sign-in that works independently of Jellyfin, use Omnifin's local administrator account. In Settings, disable **Use Jellyfin for authentication** and configure the **Web Username**, **Web Password**, and **Admin email address**. These correspond to `ui.jellyfin_login = false`, `ui.username`, `ui.password`, and `ui.email` in `config.ini`; restart Omnifin after changing them. Ordinary-user sign-in still uses Jellyfin.
+
+Local administrators can create, list, and email invitations while Jellyfin is unavailable. Invitation redemption creates an account in Jellyfin and requires Jellyfin to be reachable.
+
+Omnifin saves the user directory in its own database after successful user-list synchronization and personalized announcement lookups. During a Jellyfin outage, account listings and personalized immediate or scheduled announcements use that saved directory, including after an Omnifin restart. Names, last-login timestamps, activity, and Jellyfin account status are last-known values. Current email addresses and notification preferences are read from Omnifin's contact records when the message is sent.
+
+Before the first successful directory synchronization, existing saved email contacts remain available. Their addresses appear in place of unknown usernames, and `{last_login}` reports that Jellyfin has not been synced. The directory is replaced after successful synchronization, so a confirmed empty Jellyfin user list does not resurrect old contacts. Preserve Omnifin's database volume across container replacements.
+
+The announcement **Send test** action sends to the configured **Admin email address** for local administrators. Email delivery uses the configured email provider independently of Jellyfin. Playback, Jellyfin password changes, account provisioning, and changes to Jellyfin account status require a reachable Jellyfin server. Local administrator sign-in does not authenticate ordinary Jellyfin users from saved directory data.
+
 ### Smart user selection
 
 "Smart select" dropdown on the accounts toolbar lets you select users by criterion with one click:

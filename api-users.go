@@ -757,7 +757,32 @@ func (app *appContext) Announce(gc *gin.Context) {
 	if req.Test {
 		adminID := gc.GetString("jfId")
 		if adminID == "" {
-			respondAPIError(401, "errorUnauthorized", "UNAUTHORIZED", "", gc)
+			address := app.config.Section("ui").Key("email").String()
+			if !emailEnabled || address == "" {
+				respondAPIError(400, "errorAnnounceSend", "ADMIN_EMAIL_REQUIRED", "Enable email delivery and set the Admin email address in Settings before sending a test.", gc)
+				return
+			}
+			username := app.config.Section("ui").Key("username").String()
+			for _, admin := range app.adminUsers {
+				if admin.UserID == gc.GetString("userId") {
+					username = admin.Username
+					break
+				}
+			}
+			subject, message := app.expandAnnouncementGlobals(req.Subject, req.Message)
+			msg, err := app.email.construct(AnnouncementCustomContent(subject), CustomContent{Enabled: true, Content: message}, map[string]any{
+				"username": username, "last_login": "Not available for local Omnifin administrators",
+			})
+			if err != nil {
+				respondAPIError(500, "errorAnnounceConstruct", "ANNOUNCE_TEMPLATE", err.Error(), gc)
+				return
+			}
+			if err := app.email.send(msg, address); err != nil {
+				respondAPIError(500, "errorAnnounceSend", "ANNOUNCE_SEND", err.Error(), gc)
+				return
+			}
+			app.fireWebhook("announcement_sent", map[string]any{"subject": req.Subject, "recipients": 1, "test": true, "sent_by": gc.GetString("userId")})
+			respondBool(200, true, gc)
 			return
 		}
 		req.Users = []string{adminID}
@@ -766,19 +791,23 @@ func (app *appContext) Announce(gc *gin.Context) {
 	// Personalize when either the subject or body contains a recipient field.
 	unique := announcementNeedsRecipient(req.Subject, req.Message)
 	if unique {
+		recipients, lookupErr := app.announcementDirectory()
+		if lookupErr != nil {
+			respondAPIError(500, "errorAnnounceSend", "ANNOUNCE_RECIPIENT_LOOKUP", lookupErr.Error(), gc)
+			return
+		}
 		sentUsers := []string{}
 		failedUsers := []string{}
 		for _, userID := range req.Users {
-			user, err := app.safeUserByID(userID, false)
-			if err != nil {
-				app.err.Printf(lm.FailedGetUser, userID, lm.Jellyfin, err)
+			values, found := recipients[userID]
+			if !found {
 				failedUsers = append(failedUsers, userID)
 				continue
 			}
 			msg, err := app.email.construct(AnnouncementCustomContent(req.Subject), CustomContent{
 				Enabled: true,
 				Content: req.Message,
-			}, announcementRecipientValues(user))
+			}, values)
 			if err != nil {
 				app.err.Printf(lm.FailedConstructAnnouncementMessage, userID, err)
 				respondAPIError(500, "errorAnnounceConstruct", "ANNOUNCE_TEMPLATE", err.Error(), gc)
