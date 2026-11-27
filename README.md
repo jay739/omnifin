@@ -156,8 +156,20 @@ All transactional emails (welcome, invite, password reset, expiry reminder, acco
 - **Multi-channel messaging**: SMTP / Mailgun, Telegram, Discord, Matrix; per-event templates
 - **Bulk admin tools**: enable/disable, delete, apply profiles, send Markdown announcements
 - **Integrations**: Jellyseerr & Ombi provisioning, Discord role assignment, Telegram/Matrix contact linking
-- **Backups**: scheduled BadgerDB snapshots with configurable retention
+- **Backups**: scheduled BadgerDB snapshots with configurable retention, with validated restores that retain the previous database
 - **Activity log**: auditable record of all admin and lifecycle events
+
+---
+
+## Restoring a database backup
+
+In Settings, open Backups to select a server backup or upload a `.bak` file. Uploads must fit within the 100 MB request limit. Omnifin checks that the archive can be decoded before accepting a restore, and the page shows Restarting only after that acceptance. A rejected restore leaves the backup dialog open with an error so you can choose another file.
+
+On restart, Omnifin loads the archive into a separate database before replacing the current one. Keep enough free space for the upload, replacement database, and existing database. The previous database is retained beside `db` in a directory named `db-<timestamp>-pre-<backup filename>`. If preparation fails, startup continues with the original database and logs the restore error. If a final move and its rollback both fail, startup stops and logs the original database location for recovery.
+
+The restore does not combine databases. Changes made after the selected backup are replaced by that backup's contents. It restores Omnifin's database, not Jellyfin's database or Omnifin's configuration files.
+
+For development, run the browser regression checks with `node scripts/backup-restore.test.cjs` after installing npm dependencies. CI runs these checks alongside the Go suite.
 
 ---
 

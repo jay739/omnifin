@@ -126,14 +126,20 @@ export const _download = (url: string, fname: string): void => {
     req.send();
 };
 
-export const _upload = (url: string, formData: FormData): void => {
-    let req = new XMLHttpRequest();
+export const _upload = (
+    url: string,
+    formData: FormData,
+    complete?: (req: XMLHttpRequest) => void,
+): void => {
+    const req = new XMLHttpRequest();
     if (window.pages) {
         url = window.pages.Base + url;
     }
     req.open("POST", url, true);
+    req.responseType = "json";
     req.setRequestHeader("Authorization", "Bearer " + window.token);
-    // req.setRequestHeader('Content-Type', 'multipart/form-data');
+    if (complete) req.onloadend = () => complete(req);
+    // The browser supplies the multipart boundary in Content-Type.
     req.send(formData);
 };
 
@@ -486,19 +492,19 @@ export function formatApiFailure(req: XMLHttpRequest, fallback: string): string 
     if (msgKey) {
         const wm = (window as unknown as { messages?: Record<string, string> }).messages;
         if (wm && typeof wm[msgKey] === "string" && wm[msgKey]) {
-            const hint = typeof r.hint === "string" && r.hint.trim() ? " — " + r.hint : "";
+            const hint = typeof r.hint === "string" && r.hint.trim() ? "; " + r.hint : "";
             return wm[msgKey] + hint;
         }
         const tr = window.lang?.notif(msgKey) || window.lang?.strings(msgKey);
         if (tr) {
-            const hint = typeof r.hint === "string" && r.hint.trim() ? " — " + r.hint : "";
+            const hint = typeof r.hint === "string" && r.hint.trim() ? "; " + r.hint : "";
             return tr + hint;
         }
-        const hint = typeof r.hint === "string" && r.hint.trim() ? " — " + r.hint : "";
+        const hint = typeof r.hint === "string" && r.hint.trim() ? "; " + r.hint : "";
         return msgKey + hint;
     }
     if (typeof r.hint === "string" && r.hint.trim()) {
-        return fallback + " — " + r.hint;
+        return fallback + "; " + r.hint;
     }
     return withStatus(fallback);
 }
