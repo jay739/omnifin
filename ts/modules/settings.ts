@@ -1312,15 +1312,53 @@ export class settingsList implements AsTab {
                     _download("/backups/" + b.name, b.name),
                 );
                 tr.querySelector(".backup-restore").addEventListener("click", () => {
-                    _post("/backups/restore/" + b.name, null, () => {});
-                    window.modals.backups.close();
-                    window.modals.settingsRefresh.modal.querySelector("span.heading").textContent =
-                        window.lang.strings("settingsRestarting");
-                    window.modals.settingsRefresh.show();
+                    this._restoreBackup(
+                        // The completion handler owns errors, including status 0.
+                        (complete) => _post("/backups/restore/" + b.name, null, complete, true, () => {}),
+                        tr.querySelector(".backup-restore"),
+                    );
                 });
                 table.appendChild(tr);
             }
         });
+
+    private _backupRestorePending = false;
+
+    private _restoreBackup(
+        start: (complete: (req: XMLHttpRequest) => void) => void,
+        button: HTMLElement,
+    ): void {
+        if (this._backupRestorePending) return;
+        this._backupRestorePending = true;
+        addLoader(button);
+        let finished = false;
+        const reset = () => {
+            finished = true;
+            this._backupRestorePending = false;
+            removeLoader(button);
+        };
+        const fallback = "Backup restore could not be confirmed. Check the backup list and server status before trying again.";
+        const complete = (req: XMLHttpRequest) => {
+            if (req.readyState !== 4 || finished) return;
+            reset();
+            if (req.status !== 200) {
+                window.notifications.customError("backupRestore", formatApiFailure(req, fallback));
+                return;
+            }
+            window.modals.backups.close();
+            window.modals.settingsRefresh.modal.querySelector("span.heading").textContent =
+                window.lang.strings("settingsRestarting");
+            window.modals.settingsRefresh.show();
+        };
+        try {
+            start(complete);
+        } catch {
+            if (!finished) {
+                reset();
+                window.notifications.customError("backupRestore", fallback);
+            }
+        }
+    }
 
     constructor() {
         this._groups = {};
@@ -1366,11 +1404,11 @@ export class settingsList implements AsTab {
             if (filedlg.files.length == 0) return;
             const form = new FormData();
             form.append("backups-file", filedlg.files[0], filedlg.files[0].name);
-            _upload("/backups/restore", form);
-            window.modals.backups.close();
-            window.modals.settingsRefresh.modal.querySelector("span.heading").textContent =
-                window.lang.strings("settingsRestarting");
-            window.modals.settingsRefresh.show();
+            filedlg.value = "";
+            this._restoreBackup(
+                (complete) => _upload("/backups/restore", form, complete),
+                document.getElementById("settings-backups-upload"),
+            );
         });
 
         advancedEnableToggle.onchange = () => {

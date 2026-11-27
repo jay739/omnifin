@@ -1,11 +1,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -13,14 +13,14 @@ import (
 )
 
 const (
-	BACKUP_PREFIX           = "omnifin-db"
-	BACKUP_PREFIX_LEGACY    = "jfa-go-db"
-	BACKUP_PREFIX_OLD       = "jfa-go-db-"
-	BACKUP_COMMIT_PREFIX    = "-c-"
-	BACKUP_DATE_PREFIX      = "-d-"
-	BACKUP_UPLOAD_PREFIX    = "upload-"
-	BACKUP_DATEFMT          = "2006-01-02T15-04-05"
-	BACKUP_SUFFIX           = ".bak"
+	BACKUP_PREFIX        = "omnifin-db"
+	BACKUP_PREFIX_LEGACY = "jfa-go-db"
+	BACKUP_PREFIX_OLD    = "jfa-go-db-"
+	BACKUP_COMMIT_PREFIX = "-c-"
+	BACKUP_DATE_PREFIX   = "-d-"
+	BACKUP_UPLOAD_PREFIX = "upload-"
+	BACKUP_DATEFMT       = "2006-01-02T15-04-05"
+	BACKUP_SUFFIX        = ".bak"
 )
 
 // backupFilePrefix returns the prefix to use when matching an existing file. New backups are written
@@ -282,32 +282,23 @@ func (app *appContext) makeBackup() (fileDetails CreateBackupDTO) {
 }
 
 func (app *appContext) loadPendingBackup() {
+	backupRestoreMu.Lock()
+	defer backupRestoreMu.Unlock()
 	if LOADBAK == "" {
 		return
 	}
-	oldPath := filepath.Join(app.dataPath, "db-"+strconv.FormatInt(time.Now().Unix(), 10)+"-pre-"+filepath.Base(LOADBAK))
-	err := os.Rename(app.storage.db_path, oldPath)
-	if err != nil {
-		app.err.Fatalf(lm.FailedMoveOldDB, oldPath, err)
-	}
-	app.info.Printf(lm.MoveOldDB, oldPath)
-
-	if err := app.storage.Connect(app.config); err != nil {
-		app.err.Fatalf(lm.FailedConnectDB, app.storage.db_path, err)
-	}
-	defer app.storage.Close()
-
-	f, err := os.Open(LOADBAK)
-	if err != nil {
-		app.err.Fatalf(lm.FailedOpen, LOADBAK, err)
-	}
-	err = app.storage.db.Badger().Load(f, 256)
-	f.Close()
-	if err != nil {
-		app.err.Fatalf(lm.FailedRestoreDB, LOADBAK, err)
-	}
-	app.info.Printf(lm.RestoreDB, LOADBAK)
+	path := LOADBAK
 	LOADBAK = ""
+	if err := app.restoreBackupDatabase(path); err != nil {
+		if errors.Is(err, errRestoreRollback) {
+			// Do not start against a missing database after a failed rollback.
+			app.err.Fatalf("Backup restore stopped: %v", err)
+			return
+		}
+		app.err.Printf("Backup restore rejected; original database retained: %v", err)
+		return
+	}
+	app.info.Printf(lm.RestoreDB, path)
 }
 
 func newBackupDaemon(app *appContext) *GenericDaemon {
