@@ -892,6 +892,7 @@ func main() {
         return
     }
 
+	if flagPassed("-healthcheck") || flagPassed("--healthcheck") { os.Exit(runHealthcheck()) }
 	// Generate list of "-tags" for about page.
 	BuildTagsE2EE()
 	BuildTagsTray()

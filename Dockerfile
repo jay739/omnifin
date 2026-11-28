@@ -19,4 +19,7 @@ LABEL org.opencontainers.image.version=$VERSION org.opencontainers.image.revisio
 COPY --from=support /opt/build/dist/*_linux_${TARGETARCH}* /jfa-go
 COPY --from=support /opt/build/build/data /jfa-go/data
 EXPOSE 8056 8057
-CMD [ "/jfa-go/jfa-go", "-data", "/data" ]
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 CMD ["/jfa-go/omnifin", "-healthcheck"]
+
+CMD [ "/jfa-go/omnifin", "-data", "/data" ]
