@@ -168,6 +168,11 @@ Account creation and profile setup are reported separately. If Jellyfin creates 
 The administrator creation dialog stays open and offers **Retry setup** for that existing user ID. Retry reapplies the selected profile and contact settings; it does not create a Jellyfin account, consume an invitation again, replay creation events, or send another welcome email. Integration setup can use the password already entered in the dialog, which is never stored for retries.
 
 After closing the dialog, find the existing account in Accounts and use **Apply settings** to reapply the selected profile. Integrations that have not imported the account need their own import or synchronization flow before applying their template. The admin API also supports `POST /users/{id}/setup` with the original account details and selected profile; it always reads that existing Jellyfin account first. A failed setup is not permission to submit the signup form again.
+## Web session renewal
+
+The web client renews an expired access token once through the appropriate administrator or My Account refresh endpoint. Concurrent requests share one renewal. The page and unsaved form fields stay in place, and successful background renewal does not start another set of polling timers.
+
+Requests are retried only after a 401 bearing the server middleware's `AUTHENTICATION_REQUIRED` marker, which is emitted before an API handler runs. Connection failures, timeouts, and ordinary application errors do not replay writes. If renewal is rejected, the login form opens once and protected polling stops until sign-in succeeds. Temporary renewal failures keep the saved refresh credential; **Retry saved session** can recover without entering credentials again.
 
 ## Restoring a database backup
 

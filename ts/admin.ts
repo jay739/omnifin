@@ -284,7 +284,7 @@ const renderActivityWidget = () => {
             for (const a of acts) {
                 const row = document.createElement("div");
                 row.className = "flex flex-row items-center gap-2";
-                const who = esc(a.username || a.source_username || "—");
+                const who = esc(a.username || a.source_username || ";");
                 const type = esc(a.type);
                 const value = a.value ? ` <span class="opacity-50">(${esc(a.value)})</span>` : "";
                 row.innerHTML = `
@@ -324,7 +324,7 @@ const renderWatchWidget = () => {
         const tile = (label: string, value: string, icon: string) => `
             <div class="card ~neutral @low flex flex-col gap-1 p-3">
                 <span class="text-xs opacity-60 flex flex-row items-center gap-1"><i class="${icon}"></i>${label}</span>
-                <span class="text-lg font-semibold">${value || "—"}</span>
+                <span class="text-lg font-semibold">${value || ";"}</span>
             </div>`;
         summary.innerHTML =
             tile("Plays", vars["watch_plays_30d"] || "0", "ri-play-circle-line") +
@@ -332,7 +332,7 @@ const renderWatchWidget = () => {
             tile("Active watchers", vars["active_watchers_30d"] || "0", "ri-user-line") +
             tile("Members", vars["user_count"] || "0", "ri-group-line");
         // top_users_30d / top_titles_30d come back as markdown bullet lists; render as raw HTML
-        // (Marked-style passthrough — the server-side stats endpoint already escapes user content).
+        // (Marked-style passthrough ; the server-side stats endpoint already escapes user content).
         const mdToHTML = (md: string) => {
             if (!md) return `<span class="opacity-60 italic">No data</span>`;
             return md
@@ -367,7 +367,19 @@ const lockSidebar = () => sidebarNav?.classList.add("of-nav-locked");
 const unlockSidebar = () => sidebarNav?.classList.remove("of-nav-locked");
 lockSidebar();
 
+let backgroundPolls: ReturnType<typeof setInterval>[] = [];
+const stopBackgroundPolling = () => {
+    backgroundPolls.forEach(clearInterval);
+    backgroundPolls = [];
+};
+document.addEventListener("session-expired", (event: CustomEvent) => {
+    if (event.detail.endpoint !== "/") return;
+    stopBackgroundPolling();
+    lockSidebar();
+});
+
 login.onLogin = () => {
+    stopBackgroundPolling();
     unlockSidebar();
     window.updater = new Updater();
     // FIXME: Decide whether to autoload activity or not
@@ -376,14 +388,14 @@ login.onLogin = () => {
     renderActivityWidget();
     renderWatchWidget();
     wireActivityWidgetLink();
-    setInterval(() => {
+    backgroundPolls.push(setInterval(() => {
         window.invites.reload();
         accounts.reloadIfNotInScroll();
         checkJellyfinStatus();
         renderActivityWidget();
-    }, 30 * 1000);
+    }, 30 * 1000));
     // Watch stats change slower; refresh on a longer interval to keep Jellystat load light.
-    setInterval(renderWatchWidget, 5 * 60 * 1000);
+    backgroundPolls.push(setInterval(renderWatchWidget, 5 * 60 * 1000));
     // Triggers pre and post funcs, even though we're already on that page
     window.tabs.switch(window.tabs.current);
 };
@@ -425,7 +437,7 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
     const target = e.target as HTMLElement;
     const isTyping = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
 
-    // Cmd/Ctrl+K — focus the current tab's search input
+    // Cmd/Ctrl+K ; focus the current tab's search input
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         const current = (window as any).tabs?.current;
         const search = current ? (document.getElementById(current + "-search") as HTMLInputElement | null) : null;
@@ -439,7 +451,7 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
 
     if (isTyping) return;
 
-    // Shift+/ produces "?" — show shortcut help (Esc handled by Modal class itself)
+    // Shift+/ produces "?" ; show shortcut help (Esc handled by Modal class itself)
     if (e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         showShortcutHelp();

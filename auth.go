@@ -11,8 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
-	lm "github.com/jay739/omnifin/logmessages"
 	"github.com/hrfee/mediabrowser"
+	lm "github.com/jay739/omnifin/logmessages"
 	"github.com/lithammer/shortuuid/v3"
 )
 
@@ -76,25 +76,32 @@ func CreateToken(userId, jfId string, admin bool) (string, string, error) {
 	return token, refresh, nil
 }
 
+// The marker identifies rejection before a protected handler runs. Clients may
+// renew and retry that request once without replaying an accepted operation.
+func respondSessionRequired(gc *gin.Context) {
+	gc.Header("X-Omnifin-Session", "required")
+	respondAPIError(401, "Unauthorized", "AUTHENTICATION_REQUIRED", "Sign in to continue.", gc)
+}
+
 // Caller should return if this returns false.
 func (app *appContext) decodeValidateAuthHeader(gc *gin.Context) (claims jwt.MapClaims, ok bool) {
 	ok = false
 	header := strings.SplitN(gc.Request.Header.Get("Authorization"), " ", 2)
 	if len(header) < 2 || header[0] != "Bearer" {
 		app.authLog(lm.InvalidAuthHeader)
-		respond(401, "Unauthorized", gc)
+		respondSessionRequired(gc)
 		return
 	}
 	token, err := jwt.Parse(string(header[1]), checkToken)
 	if err != nil {
 		app.authLog(fmt.Sprintf(lm.FailedParseJWT, err))
-		respond(401, "Unauthorized", gc)
+		respondSessionRequired(gc)
 		return
 	}
 	claims, ok = token.Claims.(jwt.MapClaims)
 	if !ok {
 		app.authLog(lm.FailedCastJWT)
-		respond(401, "Unauthorized", gc)
+		respondSessionRequired(gc)
 		return
 	}
 	expiryUnix := int64(claims["exp"].(float64))
@@ -102,7 +109,7 @@ func (app *appContext) decodeValidateAuthHeader(gc *gin.Context) (claims jwt.Map
 	if !(ok && token.Valid && claims["type"].(string) == "bearer" && expiry.After(time.Now())) {
 		app.authLog(lm.InvalidJWT)
 		// app.debug.Printf("Expiry: %+v, OK: %t, Valid: %t, ClaimType: %s\n", expiry, ok, token.Valid, claims["type"].(string))
-		respond(401, "Unauthorized", gc)
+		respondSessionRequired(gc)
 		ok = false
 		return
 	}
@@ -119,7 +126,7 @@ func (app *appContext) authenticate(gc *gin.Context) {
 	isAdminToken := claims["admin"].(bool)
 	if !isAdminToken {
 		app.authLog(lm.NonAdminToken)
-		respond(401, "Unauthorized", gc)
+		respondSessionRequired(gc)
 		return
 	}
 
@@ -134,7 +141,7 @@ func (app *appContext) authenticate(gc *gin.Context) {
 	}
 	if !match {
 		app.authLog(fmt.Sprintf(lm.NonAdminUser, userID))
-		respond(401, "Unauthorized", gc)
+		respondSessionRequired(gc)
 		return
 	}
 	gc.Set("jfId", jfID)
@@ -158,7 +165,7 @@ func checkToken(token *jwt.Token) (interface{}, error) {
 }
 
 type getTokenDTO struct {
-	Token   string `json:"token" example:"kjsdklsfdkljfsjsdfklsdfkldsfjdfskjsdfjklsdf"`   // API token for use with everything else.
+	Token   string `json:"token" example:"kjsdklsfdkljfsjsdfklsdfkldsfjdfskjsdfjklsdf"`    // API token for use with everything else.
 	Refresh string `json:"refresh,omitempty" example:"eyJhbGciOiJIUzI1NiJ9...refresh_jwt"` // Refresh token (also set as HttpOnly cookie). Returned for clients that can't rely on cookies.
 }
 
@@ -184,7 +191,7 @@ func (app *appContext) decodeValidateLoginHeader(gc *gin.Context, userpage bool)
 
 // hrfee/mediabrowser's GetUsers/UserByID/UserByName lazily call Authenticate()
 // internally whenever the client isn't currently authenticated (mb.Authenticated
-// == false) -- the same unchecked type assertion that panics on an unreachable
+// == false); the same unchecked type assertion that panics on an unreachable
 // Jellyfin (see validateJellyfinCredentials above) is therefore reachable from
 // ANY app.jf.* call, not just the explicit login/password-change call sites,
 // any time Jellyfin has been unreachable since the last successful auth (e.g.
@@ -273,13 +280,13 @@ func (app *appContext) validateJellyfinCredentials(username, password string, gc
 	//
 	// CRITICAL: that panic is already recovered INSIDE the library itself, by
 	// a defer mb.timeoutHandler() registered in Authenticate() before this
-	// call -- mediabrowser.NewNamedTimeoutHandler(..., noFail=true), wired up
+	// call; mediabrowser.NewNamedTimeoutHandler(..., noFail=true), wired up
 	// in main.go. It logs "Failed to authenticate with Jellyfin @ ..." via
 	// the stdlib log package (NOT app.err/app.debug, which is why it was so
 	// hard to trace) and lets Authenticate() return normally afterward. But
 	// the panic happened before `mb.Authenticated = true` and before
 	// `return user, nil` execute, so Authenticate() returns a ZERO-VALUE User{}
-	// with a NIL error -- indistinguishable from a real success by an err/=nil
+	// with a NIL error; indistinguishable from a real success by an err/=nil
 	// check alone. The defer/recover() below is intentionally kept as a
 	// backstop in case a future library version removes its own internal
 	// recovery, but it will not fire in practice: the REAL fix is checking
@@ -313,7 +320,7 @@ func (app *appContext) validateJellyfinCredentials(username, password string, gc
 		// stopped (not just slow/erroring): mb.httpClient.Do(req) inside
 		// Authenticate() fails outright (DNS lookup failure for the Jellyfin
 		// hostname, connection refused, etc.) and returns a genuine non-nil
-		// net/url error -- NOT the recovered-panic nil-err case handled
+		// net/url error; NOT the recovered-panic nil-err case handled
 		// above. Neither ErrUnauthorized nor ErrForbidden match a network
 		// error, so it used to fall through to a generic 500 here. Detect
 		// the network-failure shape specifically so this reads as "Jellyfin
