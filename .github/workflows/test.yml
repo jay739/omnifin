@@ -113,6 +113,8 @@ jobs:
         run: node scripts/account-setup.test.cjs
       - name: Web session renewal checks
         run: node scripts/session-renewal.test.cjs
+      - name: Scheduled announcement management checks
+        run: node scripts/scheduled-announcements.test.cjs
 
       - name: Go test
         run: go test -tags "e2ee goolm" -p 1 ./...

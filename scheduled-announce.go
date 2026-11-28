@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -124,14 +124,30 @@ func (app *appContext) CreateScheduledAnnouncement(gc *gin.Context) {
 // @Param id path string true "Scheduled announcement ID"
 // @Success 200 {object} boolResponse
 // @Failure 404 {object} stringResponse
+// @Failure 409 {object} stringResponse
+// @Failure 500 {object} stringResponse
 // @Router /users/announce/scheduled/{id} [delete]
 // @Security Bearer
 // @tags Users
 func (app *appContext) DeleteScheduledAnnouncement(gc *gin.Context) {
 	id := gc.Param("id")
+	lock := app.scheduledAnnouncementLock(id)
+	if !lock.TryLock() {
+		respond(409, "Delivery is already in progress. Refresh the queue after the current attempt finishes.", gc)
+		return
+	}
+	defer lock.Unlock()
 	var rec ScheduledAnnouncement
 	if err := app.storage.db.Get(id, &rec); err != nil {
-		gc.String(http.StatusNotFound, "not found")
+		if errors.Is(err, badgerhold.ErrNotFound) {
+			respond(404, "This announcement is no longer queued. Refresh the list.", gc)
+		} else {
+			respond(500, "Could not read the queue. Check storage and retry.", gc)
+		}
+		return
+	}
+	if rec.Sent || rec.Failed {
+		respond(409, "This announcement is already stopped or completed. Its delivery history has been retained.", gc)
 		return
 	}
 	if err := app.storage.db.Delete(id, ScheduledAnnouncement{}); err != nil {
@@ -139,6 +155,11 @@ func (app *appContext) DeleteScheduledAnnouncement(gc *gin.Context) {
 		return
 	}
 	respondBool(200, true, gc)
+}
+
+func (app *appContext) scheduledAnnouncementLock(id string) *sync.Mutex {
+	lock, _ := app.scheduledAnnouncementLocks.LoadOrStore(id, &sync.Mutex{})
+	return lock.(*sync.Mutex)
 }
 
 // scheduledAnnounceJob is run on every daemon tick: dispatches any announcements
@@ -156,50 +177,69 @@ func scheduledAnnounceJob(app *appContext) {
 		return
 	}
 	for _, s := range due {
-		if s.Failed || s.NextAttempt.After(time.Now()) {
-			continue
+		dispatchScheduledAnnouncement(app, s.ID)
+	}
+}
+
+// Re-read under the same per-job lock used by cancellation so a stale daemon
+// snapshot cannot dispatch a job that was canceled in the meantime.
+func dispatchScheduledAnnouncement(app *appContext, id string) {
+	lock := app.scheduledAnnouncementLock(id)
+	if !lock.TryLock() {
+		return
+	}
+	defer lock.Unlock()
+	var s ScheduledAnnouncement
+	if err := app.storage.db.Get(id, &s); err != nil {
+		return
+	}
+	if s.Sent || s.SendAt.After(time.Now()) {
+		return
+	}
+
+	if s.Failed || s.NextAttempt.After(time.Now()) {
+		return
+	}
+	if s.Attempts >= scheduledDeliveryMaxAttempts {
+		if scheduledDeliveriesComplete(&s) {
+			s.Sent = true
+			s.SentAt = time.Now()
+			s.LastError = ""
+		} else {
+			s.Failed = true
+			if s.LastError == "" {
+				s.LastError = "Delivery retry limit reached. Review the channel outcomes before retrying."
+			}
 		}
-		if s.Attempts >= scheduledDeliveryMaxAttempts {
-			if scheduledDeliveriesComplete(&s) {
-				s.Sent = true
-				s.SentAt = time.Now()
-				s.LastError = ""
-			} else {
-				s.Failed = true
-				if s.LastError == "" {
-					s.LastError = "Delivery retry limit reached. Review the channel outcomes before retrying."
-				}
-			}
-			s.NextAttempt = time.Time{}
-			if err := app.storage.db.Update(s.ID, s); err != nil {
-				app.err.Printf("scheduled announce: could not record terminal state for %s: %v", s.ID, err)
-			}
-			continue
-		}
-		s.Attempts++
-		app.debug.Printf("scheduled announce daemon: dispatching %s (%d users)", s.ID, len(s.Users))
-		// Expand global variables at delivery time, as for immediate announcements.
-		subject, message := app.expandAnnouncementGlobals(s.Subject, s.Message)
-		if err := app.sendScheduledAnnouncement(subject, message, &s); err != nil {
-			app.err.Printf("scheduled announce: send failed for %s: %v", s.ID, err)
-			s.LastError = err.Error()
-			s.Failed = s.Attempts >= scheduledDeliveryMaxAttempts || errors.Is(err, errScheduledDeliveryUncertain)
-			s.NextAttempt = time.Time{}
-			if !s.Failed {
-				s.NextAttempt = time.Now().Add(time.Duration(1<<uint(s.Attempts-1)) * time.Minute)
-			}
-			if saveErr := app.storage.db.Update(s.ID, s); saveErr != nil {
-				app.err.Printf("scheduled announce: could not record failure for %s: %v", s.ID, saveErr)
-			}
-			continue
-		}
-		s.Sent = true
-		s.SentAt = time.Now()
 		s.NextAttempt = time.Time{}
-		s.LastError = ""
 		if err := app.storage.db.Update(s.ID, s); err != nil {
-			app.err.Printf("scheduled announce: could not record completion for %s: %v", s.ID, err)
+			app.err.Printf("scheduled announce: could not record terminal state for %s: %v", s.ID, err)
 		}
+		return
+	}
+	s.Attempts++
+	app.debug.Printf("scheduled announce daemon: dispatching %s (%d users)", s.ID, len(s.Users))
+	// Expand global variables at delivery time, as for immediate announcements.
+	subject, message := app.expandAnnouncementGlobals(s.Subject, s.Message)
+	if err := app.sendScheduledAnnouncement(subject, message, &s); err != nil {
+		app.err.Printf("scheduled announce: send failed for %s: %v", s.ID, err)
+		s.LastError = err.Error()
+		s.Failed = s.Attempts >= scheduledDeliveryMaxAttempts || errors.Is(err, errScheduledDeliveryUncertain)
+		s.NextAttempt = time.Time{}
+		if !s.Failed {
+			s.NextAttempt = time.Now().Add(time.Duration(1<<uint(s.Attempts-1)) * time.Minute)
+		}
+		if saveErr := app.storage.db.Update(s.ID, s); saveErr != nil {
+			app.err.Printf("scheduled announce: could not record failure for %s: %v", s.ID, saveErr)
+		}
+		return
+	}
+	s.Sent = true
+	s.SentAt = time.Now()
+	s.NextAttempt = time.Time{}
+	s.LastError = ""
+	if err := app.storage.db.Update(s.ID, s); err != nil {
+		app.err.Printf("scheduled announce: could not record completion for %s: %v", s.ID, err)
 	}
 }
 

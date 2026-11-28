@@ -90,6 +90,8 @@ The selection then plugs into any existing bulk action, most useful for sending 
 
 The announce modal has a **"Send at"** datetime picker. Leave blank to send now (original behaviour); fill with a future time to queue the announcement. A background daemon polls every 60s, dispatches due items via the same multi-channel pipeline (email/Telegram/Discord/Matrix), and marks them sent. Queue persists across restarts.
 
+Open **Scheduled announcements** in Accounts to review the queue and sent/failed history without selecting recipients. The dialog shows scheduled times with the browser timezone, recipient counts, retry times, errors, and per-recipient delivery outcomes. Pending jobs can be canceled after confirmation; cancellation removes their queued record. Delivered messages cannot be recalled, and completed history is retained. A delivery already in progress cannot be canceled until its attempt finishes.
+
 Scheduled jobs record delivery outcomes per recipient and channel. Acknowledged sends are skipped on retry; remaining failures retry after 1, 2, 4, and 8 minutes, stopping after five attempts. The queue API exposes attempts, the next retry time, errors, and channel outcomes. If an interrupted attempt has no recorded outcome, the job stops for review rather than automatically replaying it. Verify the delivery outcome before creating a replacement job.
 
 ### Activity-based expiry auto-extension

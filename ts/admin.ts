@@ -1,3 +1,4 @@
+import {ScheduledAnnouncements} from "./modules/scheduled-announcements.js";
 import { ThemeManager } from "./modules/theme.js";
 import { lang, LangFile, loadLangSelector } from "./modules/lang.js";
 import { Modal } from "./modules/modal.js";
@@ -196,6 +197,12 @@ if (!matchedTab) {
     window.tabs.switch("", true);
 }
 
+const scheduledAnnouncements = new ScheduledAnnouncements(
+    document.getElementById("accounts-scheduled-announcements") as HTMLButtonElement,
+    new Modal(document.getElementById("modal-scheduled-announcements")),
+    id => accounts.users.get(id)?.name || id,
+);
+
 const login = new Login(window.modals.login as Modal, "/", window.loginAppearance);
 
 const setJellyfinStatus = (state: "online" | "offline" | "checking") => {
@@ -380,6 +387,7 @@ document.addEventListener("session-expired", (event: CustomEvent) => {
 
 login.onLogin = () => {
     stopBackgroundPolling();
+    scheduledAnnouncements.enable();
     unlockSidebar();
     window.updater = new Updater();
     // FIXME: Decide whether to autoload activity or not

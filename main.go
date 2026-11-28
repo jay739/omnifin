@@ -146,6 +146,7 @@ type appContext struct {
 	pwrCaptchasLock      sync.Mutex
 	ConfirmationKeys     map[string]map[string]ConfirmationKey // Map of invite code to jwt to request
 	confirmationKeysLock sync.Mutex
+ scheduledAnnouncementLocks sync.Map
 	userCache            *UserCache
 }
 
