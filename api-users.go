@@ -26,15 +26,6 @@ import (
 // @Security Bearer
 // @tags Users
 func (app *appContext) NewUserFromAdmin(gc *gin.Context) {
-	respondUser := func(code int, user, email bool, msg string, gc *gin.Context) {
-		resp := newUserResponse{
-			User:  user,
-			Email: email,
-			Error: msg,
-		}
-		gc.JSON(code, resp)
-		gc.Abort()
-	}
 	var req newUserDTO
 	if err := gc.ShouldBindJSON(&req); err != nil {
 		respondAPIError(400, "errorUnknown", "BAD_REQUEST", err.Error(), gc)
@@ -54,45 +45,17 @@ func (app *appContext) NewUserFromAdmin(gc *gin.Context) {
 		ContextForIPLogging: gc,
 		Profile:             &profile,
 	})
-	if !nu.Success {
+	if !nu.Created {
 		nu.Log()
-		respondUser(nu.Status, nu.Created, true, nu.Message, gc)
+		gc.JSON(nu.Status, nu.response(true))
 		return
 	}
-
-	var emailStore *EmailAddress = nil
-	if emailEnabled && req.Email != "" {
-		emailStore = &EmailAddress{
-			Addr:    req.Email,
-			Contact: true,
-		}
-		app.storage.SetEmailsKey(nu.User.ID, *emailStore)
-	}
-
-	for _, tps := range app.thirdPartyServices {
-		if !tps.Enabled(app, &profile) {
-			continue
-		}
-		// We only have email
-		if emailStore == nil {
-			continue
-		}
-		err := tps.SetContactMethods(nu.User.ID, &req.Email, nil, nil, &common.ContactPreferences{
-			Email: &(emailStore.Contact),
-		})
-		if err != nil {
-			app.err.Printf(lm.FailedSyncContactMethods, tps.Name(), err)
-		}
-	}
-
-	welcomeMessageSentIfNecessary := true
-	if nu.Created {
+	app.completeAdminContactSetup(&nu, req, &profile)
+	welcomeMessageSentIfNecessary := !app.config.Section("welcome_email").Key("enabled").MustBool(false)
+	if nu.Success {
 		welcomeMessageSentIfNecessary = !app.WelcomeNewUser(nu.User, time.Time{})
 	}
-
-	respondUser(nu.Status, nu.Created, welcomeMessageSentIfNecessary, nu.Message, gc)
-	// These don't need to complete anytime soon
-	// wg.Wait()
+	gc.JSON(nu.Status, nu.response(welcomeMessageSentIfNecessary))
 }
 
 // @Summary Creates a new Jellyfin user via invite code
@@ -257,7 +220,12 @@ func (app *appContext) NewUserFromInvite(gc *gin.Context) {
 	}
 	app.checkInvite(req.Code, true, req.Username)
 
-	app.PostNewUserFromInvite(nu, ConfirmationKey{newUserDTO: req, completeContactMethods: completeContactMethods}, profile, invite)
+	app.PostNewUserFromInvite(&nu, ConfirmationKey{newUserDTO: req, completeContactMethods: completeContactMethods}, profile, invite)
+
+	if !nu.Success {
+		gc.JSON(nu.Status, nu.response(false))
+		return
+	}
 
 	/*responseFunc, logFunc, success := app.NewUser(req, false, gc)
 	if !success {
@@ -278,7 +246,7 @@ func (app *appContext) NewUserFromInvite(gc *gin.Context) {
 }
 
 // PostNewUserFromInvite attaches user details (e.g. contact method details) to a new user once they've been created from an invite.
-func (app *appContext) PostNewUserFromInvite(nu NewUserData, req ConfirmationKey, profile *Profile, invite Invite) {
+func (app *appContext) PostNewUserFromInvite(nu *NewUserData, req ConfirmationKey, profile *Profile, invite Invite) {
 	nonEmailContactMethodEnabled := false
 	for i, c := range req.completeContactMethods {
 		if c.Verified {
@@ -390,10 +358,13 @@ func (app *appContext) PostNewUserFromInvite(nu NewUserData, req ConfirmationKey
 		err := tps.SetContactMethods(nu.User.ID, &(req.Email), discordUser, telegramUser, &contactPrefs)
 		if err != nil {
 			app.err.Printf(lm.FailedSyncContactMethods, tps.Name(), err)
+			nu.addSetupFailure(tps.Name() + " contact synchronization")
 		}
 	}
 
-	app.WelcomeNewUser(nu.User, expiry)
+	if nu.Success {
+		app.WelcomeNewUser(nu.User, expiry)
+	}
 }
 
 // @Summary Enable/Disable a list of users, optionally notifying them why.

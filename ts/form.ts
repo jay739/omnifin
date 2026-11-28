@@ -338,6 +338,15 @@ const create = (event: SubmitEvent) => {
         (req: XMLHttpRequest) => {
             if (req.readyState != 4) return;
             removeLoader(submitSpan);
+            if (req.response?.user === true && req.response?.setup_complete === false) {
+                submitInput.disabled = true;
+                submitSpan.textContent = "Account setup incomplete";
+                const notice = document.createElement("p");
+                notice.setAttribute("role", "alert");
+                notice.textContent = "Your account was created, but setup is incomplete. Contact the administrator to finish setup. Do not sign up again.";
+                submitSpan.parentElement.appendChild(notice);
+                return;
+            }
             let vals = req.response as ValidatorRespDTO;
             let valid = true;
             for (let type in vals) {

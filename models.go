@@ -35,9 +35,12 @@ type newUserDTO struct {
 }
 
 type newUserResponse struct {
-	User  bool   `json:"user" binding:"required"` // Whether user was created successfully
-	Email bool   `json:"email"`                   // Whether welcome email was successfully sent (always true if feature is disabled)
-	Error string `json:"error"`                   // Optional error message.
+	UserID        string   `json:"user_id,omitempty"`
+	SetupComplete bool     `json:"setup_complete"`
+	FailedStages  []string `json:"failed_stages,omitempty"`
+	User          bool     `json:"user" binding:"required"` // Whether user was created successfully
+	Email         bool     `json:"email"`                   // Whether welcome email was successfully sent (always true if feature is disabled)
+	Error         string   `json:"error"`                   // Optional error message.
 }
 
 type deleteUserDTO struct {
@@ -245,10 +248,10 @@ type userSettingsDTO struct {
 }
 
 type announcementDTO struct {
-	Users   []string `json:"users"`             // List of User IDs to send announcement to
-	Subject string   `json:"subject"`           // Email subject
-	Message string   `json:"message"`           // Email content (markdown supported)
-	Test    bool     `json:"test,omitempty"`    // If true, ignore Users and send only to the currently logged-in admin
+	Users   []string `json:"users"`          // List of User IDs to send announcement to
+	Subject string   `json:"subject"`        // Email subject
+	Message string   `json:"message"`        // Email content (markdown supported)
+	Test    bool     `json:"test,omitempty"` // If true, ignore Users and send only to the currently logged-in admin
 }
 
 // userFilterDTO is used by /users/filter to request a list of Jellyfin user IDs matching

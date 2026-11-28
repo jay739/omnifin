@@ -1107,6 +1107,9 @@ export class accountsList extends PaginatedList implements Navigatable, AsTab {
     // Whether the enable/disable button should enable or not.
     private _shouldEnable = false;
 
+    private _pendingUserSetupID = "";
+    private _addUserPending = false;
+    private _addUserSubmitText = "";
     private _addUserForm = document.getElementById("form-add-user") as HTMLFormElement;
     private _addUserName = this._addUserForm.querySelector("input[type=text]") as HTMLInputElement;
     private _addUserEmail = this._addUserForm.querySelector("input[type=email]") as HTMLInputElement;
@@ -1285,10 +1288,15 @@ export class accountsList extends PaginatedList implements Navigatable, AsTab {
             this.processSelectedAccounts();
         });
         this._addUserButton.onclick = () => {
+            this._pendingUserSetupID = "";
+            this._addUserName.readOnly = false;
+            this._addUserProfile.disabled = false;
+            const button = this._addUserForm.querySelector("span.submit");
+            if (this._addUserSubmitText) button.textContent = this._addUserSubmitText;
             this._populateAddUserProfiles();
             window.modals.addUser.toggle();
         };
-        this._addUserForm.addEventListener("submit", this._addUser);
+        this._addUserForm.addEventListener("submit", (event) => this._addUser(event));
 
         this._deleteNotify.onchange = () => {
             if (this._deleteNotify.checked) {
@@ -2037,8 +2045,9 @@ export class accountsList extends PaginatedList implements Navigatable, AsTab {
         window.open(url, "_blank", "noopener,noreferrer");
     };
 
-    private _addUser = (event: Event) => {
+    private _addUser(event: Event): void {
         event.preventDefault();
+        if (this._addUserPending) return;
         const button = this._addUserForm.querySelector("span.submit") as HTMLSpanElement;
         const send = {
             username: this._addUserName.value,
@@ -2046,48 +2055,46 @@ export class accountsList extends PaginatedList implements Navigatable, AsTab {
             password: this._addUserPassword.value,
             profile: this._addUserProfile.value,
         };
-        for (let field in send) {
+        for (const field in send) {
             if (!send[field]) {
                 window.notifications.customError("addUserBlankField", window.lang.notif("errorBlankFields"));
                 return;
             }
         }
-        toggleLoader(button);
-        _post(
-            "/user",
-            send,
-            (req: XMLHttpRequest) => {
-                if (req.readyState == 4) {
-                    toggleLoader(button);
-                    if (req.status == 200 || (req.response["user"] as boolean)) {
-                        window.notifications.customSuccess(
-                            "addUser",
-                            window.lang.var("notifications", "userCreated", `"${send["username"]}"`),
-                        );
-                        if (!req.response["email"]) {
-                            window.notifications.customError("sendWelcome", window.lang.notif("errorSendWelcomeEmail"));
-                            console.error("User created, but welcome email failed");
-                        }
-                    } else {
-                        window.notifications.customError(
-                            "addUser",
-                            formatApiFailure(
-                                req,
-                                window.lang.var("notifications", "errorUserCreated", `"${send["username"]}"`),
-                            ),
-                        );
-                    }
-                    if (req.response["error"] as String) {
-                        console.error(req.response["error"]);
-                    }
-
-                    this.reload();
-                    window.modals.addUser.close();
+        if (!this._addUserSubmitText) this._addUserSubmitText = button.textContent;
+        this._addUserPending = true;
+        addLoader(button);
+        const retrying = Boolean(this._pendingUserSetupID);
+        const path = retrying ? "/users/" + encodeURIComponent(this._pendingUserSetupID) + "/setup" : "/user";
+        _post(path, send, (req: XMLHttpRequest) => {
+            if (req.readyState !== 4) return;
+            this._addUserPending = false;
+            removeLoader(button);
+            const result = req.response || {};
+            if (result.user === true && result.setup_complete === false && typeof result.user_id === "string") {
+                this._pendingUserSetupID = result.user_id;
+                this._addUserName.readOnly = true;
+                this._addUserProfile.disabled = true;
+                button.textContent = "Retry setup";
+                window.notifications.customError("addUserSetup", formatApiFailure(req, "Account created, but setup is incomplete. Retry setup for this account."));
+                this.reload();
+                return;
+            }
+            if (req.status === 200 && result.user === true && result.setup_complete !== false) {
+                window.notifications.customSuccess("addUser", retrying ? "Account setup completed." : window.lang.var("notifications", "userCreated", `"${send.username}"`));
+                if (result.email === false) {
+                    window.notifications.customError("sendWelcome", retrying ? "Setup completed. Welcome emails are not sent again during setup retries." : window.lang.notif("errorSendWelcomeEmail"));
                 }
-            },
-            true,
-        );
-    };
+                this._pendingUserSetupID = "";
+                this._addUserPassword.value = "";
+                button.textContent = this._addUserSubmitText;
+                this.reload();
+                window.modals.addUser.close();
+                return;
+            }
+            window.notifications.customError("addUser", formatApiFailure(req, retrying ? "Setup could not be completed. Check Jellyfin and retry for this existing account." : "Account creation could not be confirmed. Check the account list before submitting again."));
+        }, true, () => {});
+    }
     private _substituteAnnounceVars = (content: string): string => {
         let out = content;
         for (const [key, val] of Object.entries(this._announceVars)) {

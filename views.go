@@ -720,7 +720,18 @@ func (app *appContext) NewUserFromConfirmationKey(invite Invite, key string, lan
 	}
 	app.checkInvite(req.Code, true, req.Username)
 
-	app.PostNewUserFromInvite(nu, req, profile, invite)
+	app.PostNewUserFromInvite(&nu, req, profile, invite)
+
+ if !nu.Success {
+  app.confirmationKeysLock.Lock()
+  delete(app.ConfirmationKeys[invite.Code],key)
+  app.confirmationKeysLock.Unlock()
+  app.gcHTML(gc,http.StatusBadGateway,"create-incomplete.html",OtherPage,lang,gin.H{
+   "setupMessage":"Your account was created, but setup is incomplete. Contact the administrator to finish setting up this account. Do not sign up again.",
+   "contactMessage":app.config.Section("ui").Key("contact_message").String(),
+  })
+  return
+ }
 
 	jfLink := app.EvaluateRelativePath(gc, app.config.Section("ui").Key("redirect_url").String())
 	if app.config.Section("ui").Key("auto_redirect").MustBool(false) {

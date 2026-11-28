@@ -109,5 +109,8 @@ jobs:
       - name: Backup restore browser checks
         run: node scripts/backup-restore.test.cjs
 
+      - name: Account setup browser checks
+        run: node scripts/account-setup.test.cjs
+
       - name: Go test
         run: go test -tags "e2ee goolm" -p 1 ./...
