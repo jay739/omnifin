@@ -5,6 +5,9 @@ declare var window: GlobalWindow;
 
 interface updateDTO {
     new: boolean;
+    container_managed?: boolean;
+    management_reason?: string;
+    release_url?: string;
     update: Update;
 }
 
@@ -24,6 +27,15 @@ export class Updater implements updater {
                     return;
                 }
                 let resp = req.response as updateDTO;
+                if (resp.container_managed) {
+                    this.updateAvailable = false;
+                    const notice = document.getElementById("about-update-management");
+                    if (notice) {
+                        notice.querySelector("p").textContent = resp.management_reason;
+                        notice.classList.remove("ui-hidden");
+                    }
+                    return;
+                }
                 if (resp.new) {
                     this.update = resp.update;
                     if (run) {

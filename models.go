@@ -320,8 +320,11 @@ type extendExpiryDTO struct {
 }
 
 type checkUpdateDTO struct {
-	New    bool   `json:"new"` // Whether or not there's a new update.
-	Update Update `json:"update"`
+	ContainerManaged bool   `json:"container_managed,omitempty"`
+	ManagementReason string `json:"management_reason,omitempty"`
+	ReleaseURL       string `json:"release_url,omitempty"`
+	New              bool   `json:"new"` // Whether or not there's a new update.
+	Update           Update `json:"update"`
 }
 
 type telegramPinDTO struct {

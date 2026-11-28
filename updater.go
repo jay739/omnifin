@@ -205,7 +205,7 @@ func (ud *Updater) SetTransport(t *http.Transport) {
 }
 
 func (ud *Updater) GetTag() (Tag, int, error) {
-	if ud.buildType == off {
+	if ud.buildType == off || ud.buildType == docker {
 		return Tag{}, -1, nil
 	}
 	url := fmt.Sprintf("%s/repo/%s/%s/tag/latest/%s", ud.url, ud.namespace, ud.name, ud.tag)
@@ -265,6 +265,9 @@ func (ud *Updater) getRelease() (release GHRelease, status int, err error) {
 }
 
 func (ud *Updater) GetUpdate(tag Tag) (update Update, status int, err error) {
+	if ud.buildType == off || ud.buildType == docker {
+		return Update{}, -1, nil
+	}
 	switch ud.buildType {
 	case internal:
 		if ud.tag == "internal-git" {
@@ -582,7 +585,14 @@ func (ud *Updater) pullInternal(url string) (applyUpdate ApplyUpdate, status int
 //		}
 //		newBinary,
 //	}
+func (app *appContext) containerManagedUpdates() bool {
+	return updater == "docker" || (app.updater != nil && app.updater.buildType == docker)
+}
+
 func (app *appContext) checkForUpdates() {
+	if app.containerManagedUpdates() || app.updater == nil || app.updater.buildType == off {
+		return
+	}
 	for {
 		go func() {
 			tag, status, err := app.updater.GetTag()

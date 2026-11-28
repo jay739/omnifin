@@ -1,0 +1,25 @@
+const assert = require('node:assert/strict');
+const Module = require('node:module');
+const {buildSync} = require('esbuild');
+const {JSDOM} = require('jsdom');
+const fs = require('node:fs');
+const html = fs.readFileSync('html/admin.html', 'utf8');
+const notice = html.match(/<div id="about-update-management"[\s\S]*?<\/div>/)[0];
+const dom = new JSDOM(notice + '<button id="update-update"></button>');
+global.window = dom.window; global.document = dom.window.document;
+window.pages = {Base:'/prefix'}; window.token='test';
+let positive=0; window.notifications={customPositive(){positive++},customError(){throw Error('unexpected error')}};
+const requests=[];
+class XHR {open(method,url){this.url=url} setRequestHeader(){} send(){requests.push(this)} }
+global.XMLHttpRequest=XHR;
+const compiled=buildSync({entryPoints:['ts/modules/update.ts'],bundle:true,platform:'node',format:'cjs',write:false});
+const mod=new Module(__filename,module);mod.paths=module.paths;mod._compile(compiled.outputFiles[0].text,__filename);
+const updater=new mod.exports.Updater();
+assert.equal(requests[0].url,'/prefix/config/update');
+Object.assign(requests[0],{readyState:4,status:200,response:{new:true,container_managed:true,management_reason:'Promote a published image.'}});
+requests[0].onreadystatechange();
+assert.equal(updater.updateAvailable,false); assert.equal(positive,0);
+assert.equal(document.getElementById('about-update-management').classList.contains('ui-hidden'),false);
+assert.equal(document.querySelector('p').textContent,'Promote a published image.');
+assert.equal(document.querySelector('a').href,'https://github.com/jay739/omnifin/releases');
+console.log('Container update notice checks passed');
