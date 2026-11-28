@@ -32,3 +32,15 @@ func TestTagIsNew(t *testing.T) {
 		})
 	}
 }
+
+func TestTagIsNewWithFullBuildRevision(t *testing.T) {
+	previous := commit
+	t.Cleanup(func() { commit = previous })
+	commit = "abcdef0123456789abcdef0123456789abcdef0123"
+	for _, candidate := range []string{"abcdef0", commit} {
+		tag := Tag{Version: candidate, Ready: true, ReleaseDate: UnixTime{Time: buildTime.Add(21 * time.Minute)}}
+		if tag.IsNew() {
+			t.Fatal("current full build revision was reported as an update")
+		}
+	}
+}

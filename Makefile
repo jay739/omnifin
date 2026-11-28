@@ -16,11 +16,12 @@ CSS_BUNDLE = $(DATA)/web/css/$(CSSVERSION)bundle.css
 
 VERSION ?= $(shell git describe --exact-match HEAD 2> /dev/null || echo vgit)
 VERSION := $(shell echo $(VERSION) | sed 's/v//g')
-COMMIT ?= $(shell git rev-parse --short HEAD || echo unknown)
+COMMIT ?= $(shell git rev-parse HEAD || echo unknown)
+BUILD_MODE ?= binary
 BUILDTIME ?= $(shell date +%s)
 
 UPDATER ?= off
-LDFLAGS := -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.cssVersion=$(CSSVERSION) -X main.buildTimeUnix=$(BUILDTIME) $(if $(BUILTBY),-X 'main.builtBy=$(BUILTBY)',)
+LDFLAGS := -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buildMode=$(BUILD_MODE) -X main.cssVersion=$(CSSVERSION) -X main.buildTimeUnix=$(BUILDTIME) $(if $(BUILTBY),-X 'main.builtBy=$(BUILTBY)',)
 ifeq ($(UPDATER), on)
 	LDFLAGS := $(LDFLAGS) -X main.updater=binary
 else ifneq ($(UPDATER), off)
@@ -106,7 +107,7 @@ endif
 
 # FLAG HASHING: To rebuild on flag change.
 # credit for idea to https://bnikolic.co.uk/blog/sh/make/unix/2021/07/08/makefile.html
-rebuildFlags := GOESBUILD GOBINARY VERSION COMMIT UPDATER INTERNAL TRAY E2EE TAGS DEBUG RACE
+rebuildFlags := GOESBUILD GOBINARY VERSION COMMIT BUILD_MODE UPDATER INTERNAL TRAY E2EE TAGS DEBUG RACE
 rebuildVals := $(foreach v,$(rebuildFlags),$(v)=$($(v)))
 rebuildHash := $(strip $(shell echo $(rebuildVals) | sha256sum | cut -d " " -f1))
 rebuildHashFile := $(DATA)/buildhash-$(rebuildHash).txt

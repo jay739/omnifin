@@ -235,12 +235,12 @@ func (ud *Updater) GetTag() (Tag, int, error) {
 
 func (t *Tag) IsNew() bool {
 	// The update service identifies builds by a commit with at least seven characters.
-	if len(t.Version) < 7 {
+	if len(t.Version) < 7 || len(commit) < 7 {
 		return false
 	}
 	// fmt.Printf("Build Time: %+v, Release Date: %+v", buildTime, t.ReleaseDate)
 	// Add 20 minutes to account for build time
-	return t.Version[:7] != commit && t.Ready && t.ReleaseDate.After(buildTime.Add(time.Duration(20)*time.Minute))
+	return t.Version[:7] != commit[:7] && t.Ready && t.ReleaseDate.After(buildTime.Add(time.Duration(20)*time.Minute))
 }
 
 func (ud *Updater) getRelease() (release GHRelease, status int, err error) {

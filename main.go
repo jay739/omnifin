@@ -887,6 +887,11 @@ func printVersion() {
 const SYSTEMD_SERVICE = "omnifin.service"
 
 func main() {
+    if buildInformationRequested(os.Args[1:]) {
+        if err:=writeBuildInformation(os.Stdout);err!=nil{os.Exit(1)}
+        return
+    }
+
 	// Generate list of "-tags" for about page.
 	BuildTagsE2EE()
 	BuildTagsTray()

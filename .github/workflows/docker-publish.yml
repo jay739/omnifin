@@ -40,6 +40,10 @@ jobs:
         run: go test -tags "e2ee goolm" -p 1 ./...
 
   build-and-push:
+    outputs:
+      digest: ${{ steps.publish.outputs.digest }}
+      version: ${{ steps.tags.outputs.version }}
+      created: ${{ steps.tags.outputs.created }}
     needs: validate-release
     runs-on: ubuntu-latest
     permissions:
@@ -85,8 +89,41 @@ jobs:
             TAGS="${DOCKERHUB}:${VERSION},${DOCKERHUB}:latest,${TAGS}"
           fi
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION#v}" >> "$GITHUB_OUTPUT"
+          BUILD_TIME=$(date +%s)
+          echo "build_time=${BUILD_TIME}" >> "$GITHUB_OUTPUT"
+          echo "created=$(date -u -d "@${BUILD_TIME}" +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Build image for metadata verification
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          provenance: false
+          tags: omnifin-metadata:check
+          build-args: |
+            VERSION=${{ steps.tags.outputs.version }}
+            REVISION=${{ github.sha }}
+            BUILD_TIME=${{ steps.tags.outputs.build_time }}
+            BUILD_DATE=${{ steps.tags.outputs.created }}
+            SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify executable and image metadata
+        run: >-
+          python3 scripts/verify-image-metadata.py
+          --image omnifin-metadata:check
+          --version '${{ steps.tags.outputs.version }}'
+          --revision '${{ github.sha }}'
+          --created '${{ steps.tags.outputs.created }}'
+          --source '${{ github.server_url }}/${{ github.repository }}'
 
       - name: Build and push multi-arch image
+        id: publish
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -94,5 +131,47 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.tags.outputs.tags }}
+          build-args: |
+            VERSION=${{ steps.tags.outputs.version }}
+            REVISION=${{ github.sha }}
+            BUILD_TIME=${{ steps.tags.outputs.build_time }}
+            BUILD_DATE=${{ steps.tags.outputs.created }}
+            SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  record-image:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ needs.build-and-push.outputs.version }}
+      IMAGE_DIGEST: ${{ needs.build-and-push.outputs.digest }}
+      BUILD_DATE: ${{ needs.build-and-push.outputs.created }}
+    steps:
+      - name: Write source-to-image mapping
+        run: |
+          python3 - <<'PYCODE'
+          import json, os
+          record = {
+              "version": os.environ["RELEASE_VERSION"],
+              "source_commit": os.environ["GITHUB_SHA"],
+              "image": "ghcr.io/" + os.environ["GITHUB_REPOSITORY_OWNER"] + "/omnifin:" + os.environ["GITHUB_REF_NAME"],
+              "manifest_digest": os.environ["IMAGE_DIGEST"],
+              "created": os.environ["BUILD_DATE"],
+              "platforms": ["linux/amd64", "linux/arm64"],
+              "build_run": os.environ["GITHUB_SERVER_URL"] + "/" + os.environ["GITHUB_REPOSITORY"] + "/actions/runs/" + os.environ["GITHUB_RUN_ID"],
+          }
+          with open("image-digests.json", "w") as output:
+              json.dump(record, output, indent=2)
+              output.write("\n")
+          PYCODE
+      - name: Attach image mapping to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$GITHUB_REF_NAME" --notes "Container artifacts for $GITHUB_REF_NAME." || gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"
+          fi
+          gh release upload "$GITHUB_REF_NAME" image-digests.json --repo "$GITHUB_REPOSITORY" --clobber

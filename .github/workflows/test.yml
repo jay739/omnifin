@@ -115,6 +115,8 @@ jobs:
         run: node scripts/session-renewal.test.cjs
       - name: Scheduled announcement management checks
         run: node scripts/scheduled-announcements.test.cjs
+      - name: Build metadata contract
+        run: python3 scripts/build-metadata.test.py
 
       - name: Go test
         run: go test -tags "e2ee goolm" -p 1 ./...
