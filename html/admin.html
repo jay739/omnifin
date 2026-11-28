@@ -248,6 +248,25 @@
                 </div>
             </form>
         </div>
+        <div id="modal-scheduled-announcements" class="modal" role="dialog" aria-modal="true" aria-labelledby="scheduled-announcement-title">
+            <section class="card content relative mx-auto my-[5%] w-11/12 max-w-6xl max-h-[85vh] overflow-y-auto rounded-2xl">
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="heading" id="scheduled-announcement-title">Scheduled announcements</h2>
+                    <button type="button" class="button ~neutral @low" data-scheduled-close aria-label="Close scheduled announcements">Close</button>
+                </div>
+                <p class="content">Review upcoming messages and delivery history. Cancellation stops delivery that has not started.</p>
+                <div class="flex flex-wrap items-center gap-3 my-3">
+                    <label>Show <select class="select ~neutral @low" data-scheduled-filter><option value="all">All announcements</option><option value="pending">Queued and retrying</option><option value="history">Sent and failed</option></select></label>
+                    <button type="button" class="button ~neutral @low" data-scheduled-refresh>Refresh</button>
+                    <span class="text-sm opacity-80" data-scheduled-timezone></span>
+                </div>
+                <p data-scheduled-status role="status" aria-live="polite"></p>
+                <div class="overflow-x-auto"><table class="table w-full text-left">
+                    <thead><tr><th scope="col">Announcement</th><th scope="col">Scheduled time</th><th scope="col">Recipients</th><th scope="col">Delivery</th><th scope="col">Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table></div>
+            </section>
+        </div>
         <div id="modal-announce" class="modal">
             <form class="relative mx-auto my-[8%] w-4/5 max-h-[85vh] overflow-y-auto rounded-2xl border border-black/10 shadow-2xl dark:border-white/10 lg:w-2/3 content card" id="form-announce" href="">
                 <span class="heading"><span id="header-announce"></span> <span class="modal-close">&times;</span></span>
@@ -823,6 +842,7 @@
                                 </div>
                             </div>
                         </div>
+                        <button type="button" class="button ~neutral @low center" id="accounts-scheduled-announcements" disabled>Scheduled announcements</button>
                         <span class="button ~neutral @low center " id="accounts-add-user">{{ .quantityStrings.addUser.Singular }}</span>
                         <span class="button ~neutral @low center action-unavailable" id="accounts-copy-ids" title="{{ .strings.copyUserIdsHint }}">{{ .strings.copyUserIds }}</span>
                         <span class="button ~neutral @low center action-unavailable" id="accounts-open-jellyfin" title="{{ .strings.openInJellyfinHint }}">{{ .strings.openInJellyfin }}</span>
