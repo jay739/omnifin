@@ -14,7 +14,7 @@ GOBINARY ?= go
 CSSVERSION ?= $(shell git describe --tags --abbrev=0)
 CSS_BUNDLE = $(DATA)/web/css/$(CSSVERSION)bundle.css
 
-VERSION ?= $(shell git describe --exact-match HEAD 2> /dev/null || echo vgit)
+VERSION ?= $(shell git describe --tags --exact-match HEAD 2> /dev/null || echo vgit)
 VERSION := $(shell echo $(VERSION) | sed 's/v//g')
 COMMIT ?= $(shell git rev-parse HEAD || echo unknown)
 BUILD_MODE ?= binary

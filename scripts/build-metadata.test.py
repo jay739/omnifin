@@ -40,6 +40,36 @@ class BuildMetadataTests(unittest.TestCase):
         self.assertEqual(data["JFA_GO_COMMIT"],"unknown")
         self.assertTrue(data["JFA_GO_BUILD_TIME"].isdigit())
 
+    def test_tagged_checkout_versions(self):
+        # checkout can fetch a commit directly into a tag ref, making it lightweight.
+        for annotated in (False, True):
+            with self.subTest(annotated=annotated), tempfile.TemporaryDirectory(prefix="omnifin-tag-") as folder:
+                fixture = Path(folder)
+                def git(*args):
+                    return subprocess.check_output(["git", *args], cwd=fixture, text=True, stderr=subprocess.PIPE).strip()
+                git("init", "-q")
+                git("-c", "user.name=Jayakrishna Konda", "-c", "user.email=contact@jay739.dev", "commit", "--allow-empty", "-qm", "metadata fixture")
+                if annotated:
+                    git("-c", "user.name=Jayakrishna Konda", "-c", "user.email=contact@jay739.dev", "tag", "-a", "v9.8.7", "-m", "metadata fixture")
+                else:
+                    git("tag", "v9.8.7")
+                capture = fixture / "capture.py"
+                capture.write_text("#!/usr/bin/env python3\nimport json,os\nprint(json.dumps({k:os.environ[k] for k in ['JFA_GO_VERSION','JFA_GO_COMMIT','JFA_GO_CSS_VERSION']}))\n")
+                capture.chmod(0o755)
+                env = {k:v for k,v in os.environ.items() if not k.startswith("JFA_GO_")}
+                result = subprocess.run(["bash", str(REPO / "scripts/version.sh"), str(capture)], cwd=fixture, env=env, text=True, capture_output=True, timeout=15)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                metadata = json.loads(result.stdout)
+                self.assertEqual(metadata["JFA_GO_VERSION"], "9.8.7")
+                self.assertEqual(metadata["JFA_GO_COMMIT"], git("rev-parse", "HEAD"))
+                self.assertEqual(metadata["JFA_GO_CSS_VERSION"], "v9.8.7")
+                # Evaluate just the actual Makefile metadata declarations in the fixture.
+                declarations = "\n".join(line for line in (REPO / "Makefile").read_text().splitlines() if line.startswith(("VERSION ?=", "VERSION :=")))
+                makefile = fixture / "fixture.mk"
+                makefile.write_text(declarations + "\n.PHONY: print\nprint:\n\t@printf '%s' '$(VERSION)'\n")
+                value = subprocess.check_output(["make", "--no-print-directory", "-f", str(makefile), "print"], cwd=fixture, text=True, env=env)
+                self.assertEqual(value, "9.8.7")
+
     def test_compiled_binary_identifies_full_source_revision(self):
         binary=REPO / "build/omnifin"
         if not binary.exists(): self.skipTest("run make all before checking the compiled binary")

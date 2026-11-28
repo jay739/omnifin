@@ -17,7 +17,7 @@ export INTERNAL="${INTERNAL:-on}"
 if [[ "$INTERNAL" == "on" ]]; then export JFA_GO_TAG=""; else export JFA_GO_TAG="external"; fi
 if [[ -z "${UPDATER:-}" ]]; then export JFA_GO_UPDATER=binary; else export JFA_GO_UPDATER="$UPDATER"; fi
 
-export JFA_GO_VERSION="${JFA_GO_VERSION:-$(git describe --exact-match HEAD 2>/dev/null || printf development)}"
+export JFA_GO_VERSION="${JFA_GO_VERSION:-$(git describe --tags --exact-match HEAD 2>/dev/null || printf development)}"
 export JFA_GO_VERSION="${JFA_GO_VERSION#v}"
 export JFA_GO_COMMIT="${JFA_GO_COMMIT:-$(git rev-parse HEAD 2>/dev/null || printf unknown)}"
 export JFA_GO_BUILD_TIME="${JFA_GO_BUILD_TIME:-$(date +%s)}"
