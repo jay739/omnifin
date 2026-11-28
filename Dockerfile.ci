@@ -7,4 +7,6 @@ COPY ./build/data /jfa-go/data
 EXPOSE 8056
 EXPOSE 8057
 
-CMD [ "/jfa-go/jfa-go", "-data", "/data" ]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 CMD ["/jfa-go/omnifin", "-healthcheck"]
+
+CMD [ "/jfa-go/omnifin", "-data", "/data" ]

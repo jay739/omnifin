@@ -424,3 +424,9 @@ Jayakrishna Konda, [github.com/jay739](https://github.com/jay739)
 MIT.
 
 Both the original jfa-go license (Copyright 2025 Harvey Tindall) and the Omnifin additions (Copyright 2026 Jayakrishna Konda) are preserved in [LICENSE](LICENSE).
+
+### Container liveness
+
+Images include an executable health probe, so distroless images need no shell or curl. `omnifin -healthcheck` checks `http://127.0.0.1:8056/health`, exits zero only for HTTP 200 with `status: ok`, and times out after three seconds. Set `OMNIFIN_HEALTH_URL` when using a custom port or URL prefix. It runs before configuration loading and never opens the application database.
+
+This measures the HTTP listener, not Jellyfin or email readiness. An optional integration outage must not make the process unhealthy. Docker probes every 30 seconds after a 120-second start period and marks three consecutive failures unhealthy. Docker restart policies alone do not recover an unhealthy running process. Configure a host monitor or orchestrator with bounded retries and operator-visible logs.

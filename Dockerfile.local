@@ -5,4 +5,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 COPY build/omnifin /opt/omnifin/omnifin
 COPY build/data /opt/omnifin/data
 EXPOSE 8056 8057
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 CMD ["/opt/omnifin/omnifin", "-healthcheck"]
+
 CMD ["/opt/omnifin/omnifin", "-data", "/data"]

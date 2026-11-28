@@ -117,6 +117,8 @@ jobs:
         run: node scripts/scheduled-announcements.test.cjs
       - name: Build metadata contract
         run: python3 scripts/build-metadata.test.py
+      - name: Executable liveness checks
+        run: python3 scripts/healthcheck-cli.test.py
 
       - name: Go test
         run: go test -tags "e2ee goolm" -p 1 ./...

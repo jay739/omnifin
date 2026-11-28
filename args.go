@@ -16,6 +16,7 @@ func (app *appContext) loadArgs(firstCall bool) {
 	if firstCall {
 		flag.Usage = helpFunc
 		flag.Bool("version", false, "print build metadata as JSON and exit.")
+		flag.Bool("healthcheck", false, "probe the local HTTP listener and exit.")
 		help := flag.Bool("help", false, "prints this message.")
 		flag.BoolVar(help, "h", false, "SHORTHAND")
 
