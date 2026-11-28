@@ -33,7 +33,7 @@ func TestUpdaterHTTPFailures(t *testing.T) {
 					body := &updaterTestBody{Reader: strings.NewReader("service unavailable")}
 					timeoutCalls := 0
 					ud := &Updater{
-						buildType:      docker,
+						buildType:      external,
 						url:            "https://updates.example.invalid",
 						timeoutHandler: func() { timeoutCalls++ },
 						httpClient: &http.Client{Transport: updaterTestTransport(func(*http.Request) (*http.Response, error) {

@@ -341,6 +341,10 @@ func (app *appContext) ModifyConfig(gc *gin.Context) {
 // @Security Bearer
 // @tags Configuration
 func (app *appContext) CheckUpdate(gc *gin.Context) {
+	if app.containerManagedUpdates() {
+		gc.JSON(200, checkUpdateDTO{ContainerManaged:true, ManagementReason: "Updates are managed by your container deployment. Promote a published Omnifin image, then recreate this container.", ReleaseURL: "https://github.com/jay739/omnifin/releases"})
+		return
+	}
 	if !app.newUpdate {
 		app.update = Update{}
 	}
@@ -356,6 +360,10 @@ func (app *appContext) CheckUpdate(gc *gin.Context) {
 // @Security Bearer
 // @tags Configuration
 func (app *appContext) ApplyUpdate(gc *gin.Context) {
+	if app.containerManagedUpdates() {
+		respond(409, "Update the deployed container image to install a new version.", gc)
+		return
+	}
 	if !app.update.CanUpdate {
 		app.info.Printf(lm.FailedApplyUpdate, lm.UpdateManual)
 		respond(400, lm.UpdateManual, gc)
