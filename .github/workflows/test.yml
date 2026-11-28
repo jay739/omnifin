@@ -111,6 +111,8 @@ jobs:
 
       - name: Account setup browser checks
         run: node scripts/account-setup.test.cjs
+      - name: Web session renewal checks
+        run: node scripts/session-renewal.test.cjs
 
       - name: Go test
         run: go test -tags "e2ee goolm" -p 1 ./...

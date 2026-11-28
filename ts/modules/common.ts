@@ -1,3 +1,4 @@
+import {runAuthenticatedRequest, sessionHandled} from "./session.js";
 declare var window: GlobalWindow;
 import dateParser from "any-date-parser";
 import { Temporal } from "temporal-polyfill";
@@ -72,180 +73,75 @@ export function DateCountdown(el: HTMLElement, unixSeconds: number): ReturnType<
     return setTimeout(update, 60000);
 }
 
+function request(
+    method: string, url: string, body: Document | XMLHttpRequestBodyInit | null,
+    type: XMLHttpRequestResponseType, contentType: string | null,
+    complete: (req: XMLHttpRequest) => void,
+): void {
+    const target = (window.pages?.Base || "") + url;
+    runAuthenticatedRequest(url, (done) => {
+        const req = new XMLHttpRequest();
+        req.open(method, target, true);
+        req.responseType = type;
+        req.setRequestHeader("Authorization", "Bearer " + window.token);
+        if (contentType) req.setRequestHeader("Content-Type", contentType);
+        let settled = false;
+        const finish = () => {
+            if (req.readyState !== 4 || settled) return;
+            settled = true;
+            done(req);
+        };
+        req.onreadystatechange = finish;
+        req.onloadend = finish;
+        req.send(body);
+    }, complete);
+}
+
+function notifyFailure(req: XMLHttpRequest, noConnectionError: boolean): void {
+    if (sessionHandled(req)) return;
+    if (req.status === 0) { if (!noConnectionError) window.notifications.connectionError(); }
+    else if (req.status === 401) window.notifications.customError("401Error", formatApiFailure(req, window.lang.notif("error401Unauthorized")));
+    else if (req.status === 403) window.notifications.customError("403Error", formatApiFailure(req, window.lang.notif("error403Forbidden")));
+    else if (req.status === 429) window.notifications.customError("429Error", formatApiFailure(req, window.lang.notif("error429TooManyRequests")));
+}
+
 export const _get = (
-    url: string,
-    data: Object,
-    onreadystatechange: (req: XMLHttpRequest) => void,
-    noConnectionError: boolean = false,
-): void => {
-    let req = new XMLHttpRequest();
-    if (window.pages) {
-        url = window.pages.Base + url;
-    }
-    req.open("GET", url, true);
-    req.responseType = "json";
-    req.setRequestHeader("Authorization", "Bearer " + window.token);
-    req.setRequestHeader("Content-Type", "application/json; charset=UTF-8");
-    req.onreadystatechange = () => {
-        if (req.status == 0) {
-            if (!noConnectionError) window.notifications.connectionError();
-            return;
-        } else if (req.status == 401) {
-            window.notifications.customError("401Error", window.lang.notif("error401Unauthorized"));
-        } else if (req.status == 403) {
-            window.notifications.customError(
-                "403Error",
-                formatApiFailure(req, window.lang.notif("error403Forbidden")),
-            );
-        } else if (req.status == 429) {
-            window.notifications.customError(
-                "429Error",
-                formatApiFailure(req, window.lang.notif("error429TooManyRequests")),
-            );
-        }
-        onreadystatechange(req);
-    };
-    req.send(JSON.stringify(data));
-};
+    url: string, data: Object, complete: (req: XMLHttpRequest) => void, noConnectionError = false,
+): void => request("GET", url, JSON.stringify(data), "json", "application/json; charset=UTF-8", (req) => {
+    notifyFailure(req, noConnectionError); complete(req);
+});
 
 export const _download = (url: string, fname: string): void => {
-    let req = new XMLHttpRequest();
-    if (window.pages) {
-        url = window.pages.Base + url;
-    }
-    req.open("GET", url, true);
-    req.responseType = "blob";
-    req.setRequestHeader("Authorization", "Bearer " + window.token);
-    req.setRequestHeader("Content-Type", "application/json; charset=UTF-8");
-    req.onload = (e: Event) => {
-        let link = document.createElement("a") as HTMLAnchorElement;
-        link.href = URL.createObjectURL(req.response);
-        link.download = fname;
-        link.dispatchEvent(new MouseEvent("click"));
-    };
-    req.send();
+    request("GET", url, null, "blob", null, (req) => {
+        if (req.status !== 200) { notifyFailure(req, false); return; }
+        const link = document.createElement("a");
+        const blob = URL.createObjectURL(req.response);
+        link.href = blob; link.download = fname; link.dispatchEvent(new MouseEvent("click"));
+        setTimeout(() => URL.revokeObjectURL(blob), 1000);
+    });
 };
 
-export const _upload = (
-    url: string,
-    formData: FormData,
-    complete?: (req: XMLHttpRequest) => void,
-): void => {
-    const req = new XMLHttpRequest();
-    if (window.pages) {
-        url = window.pages.Base + url;
-    }
-    req.open("POST", url, true);
-    req.responseType = "json";
-    req.setRequestHeader("Authorization", "Bearer " + window.token);
-    if (complete) req.onloadend = () => complete(req);
+export const _upload = (url: string, formData: FormData, complete?: (req: XMLHttpRequest) => void): void => {
     // The browser supplies the multipart boundary in Content-Type.
-    req.send(formData);
+    request("POST", url, formData, "json", null, complete || (() => {}));
 };
 
 export const _req = (
-    method: string,
-    url: string,
-    data: Object,
-    onreadystatechange: (req: XMLHttpRequest) => void,
-    response?: boolean,
-    statusHandler?: (req: XMLHttpRequest) => void,
-    noConnectionError: boolean = false,
-): void => {
-    let req = new XMLHttpRequest();
-    if (window.pages) {
-        url = window.pages.Base + url;
-    }
-    req.open(method, url, true);
-    if (response) {
-        req.responseType = "json";
-    }
-    req.setRequestHeader("Authorization", "Bearer " + window.token);
-    req.setRequestHeader("Content-Type", "application/json; charset=UTF-8");
-    req.onreadystatechange = () => {
-        if (statusHandler) {
-            statusHandler(req);
-        } else if (req.status == 0) {
-            if (!noConnectionError) window.notifications.connectionError();
-            return;
-        } else if (req.status == 401) {
-            window.notifications.customError("401Error", window.lang.notif("error401Unauthorized"));
-        } else if (req.status == 403) {
-            window.notifications.customError(
-                "403Error",
-                formatApiFailure(req, window.lang.notif("error403Forbidden")),
-            );
-        } else if (req.status == 429) {
-            window.notifications.customError(
-                "429Error",
-                formatApiFailure(req, window.lang.notif("error429TooManyRequests")),
-            );
-        }
-        onreadystatechange(req);
-    };
-    req.send(JSON.stringify(data));
-};
+    method: string, url: string, data: Object, complete: (req: XMLHttpRequest) => void,
+    response?: boolean, statusHandler?: (req: XMLHttpRequest) => void, noConnectionError = false,
+): void => request(method, url, JSON.stringify(data), response ? "json" : "", "application/json; charset=UTF-8", (req) => {
+    if (statusHandler) statusHandler(req); else notifyFailure(req, noConnectionError);
+    complete(req);
+});
 
-export const _post = (
-    url: string,
-    data: Object,
-    onreadystatechange: (req: XMLHttpRequest) => void,
-    response?: boolean,
-    statusHandler?: (req: XMLHttpRequest) => void,
-    noConnectionError: boolean = false,
-): void => _req("POST", url, data, onreadystatechange, response, statusHandler, noConnectionError);
-
-export const _put = (
-    url: string,
-    data: Object,
-    onreadystatechange: (req: XMLHttpRequest) => void,
-    response?: boolean,
-    statusHandler?: (req: XMLHttpRequest) => void,
-    noConnectionError: boolean = false,
-): void => _req("PUT", url, data, onreadystatechange, response, statusHandler, noConnectionError);
-
-export const _patch = (
-    url: string,
-    data: Object,
-    onreadystatechange: (req: XMLHttpRequest) => void,
-    response?: boolean,
-    statusHandler?: (req: XMLHttpRequest) => void,
-    noConnectionError: boolean = false,
-): void => _req("PATCH", url, data, onreadystatechange, response, statusHandler, noConnectionError);
-
-export function _delete(
-    url: string,
-    data: Object,
-    onreadystatechange: (req: XMLHttpRequest) => void,
-    noConnectionError: boolean = false,
-): void {
-    let req = new XMLHttpRequest();
-    if (window.pages) {
-        url = window.pages.Base + url;
-    }
-    req.open("DELETE", url, true);
-    req.setRequestHeader("Authorization", "Bearer " + window.token);
-    req.setRequestHeader("Content-Type", "application/json; charset=UTF-8");
-    req.onreadystatechange = () => {
-        if (req.status == 0) {
-            if (!noConnectionError) window.notifications.connectionError();
-            return;
-        } else if (req.status == 401) {
-            window.notifications.customError("401Error", window.lang.notif("error401Unauthorized"));
-        } else if (req.status == 403) {
-            window.notifications.customError(
-                "403Error",
-                formatApiFailure(req, window.lang.notif("error403Forbidden")),
-            );
-        } else if (req.status == 429) {
-            window.notifications.customError(
-                "429Error",
-                formatApiFailure(req, window.lang.notif("error429TooManyRequests")),
-            );
-        }
-        onreadystatechange(req);
-    };
-    req.send(JSON.stringify(data));
+export const _post = (url: string, data: Object, complete: (req: XMLHttpRequest) => void, response?: boolean, statusHandler?: (req: XMLHttpRequest) => void, noConnectionError = false): void =>
+    _req("POST", url, data, complete, response, statusHandler, noConnectionError);
+export const _put = (url: string, data: Object, complete: (req: XMLHttpRequest) => void, response?: boolean, statusHandler?: (req: XMLHttpRequest) => void, noConnectionError = false): void =>
+    _req("PUT", url, data, complete, response, statusHandler, noConnectionError);
+export const _patch = (url: string, data: Object, complete: (req: XMLHttpRequest) => void, response?: boolean, statusHandler?: (req: XMLHttpRequest) => void, noConnectionError = false): void =>
+    _req("PATCH", url, data, complete, response, statusHandler, noConnectionError);
+export function _delete(url: string, data: Object, complete: (req: XMLHttpRequest) => void, noConnectionError = false): void {
+    _req("DELETE", url, data, complete, true, undefined, noConnectionError);
 }
 
 export function toClipboard(str: string) {
