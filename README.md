@@ -161,6 +161,14 @@ All transactional emails (welcome, invite, password reset, expiry reminder, acco
 
 ---
 
+## Incomplete account setup
+
+Account creation and profile setup are reported separately. If Jellyfin creates an account but a policy, configuration, display preference, integration, or contact synchronization step fails, Omnifin returns the existing user ID, `setup_complete: false`, and named `failed_stages` with HTTP 502. Invitations are consumed once the account exists, and signup pages show an incomplete-setup notice instead of a success redirect.
+
+The administrator creation dialog stays open and offers **Retry setup** for that existing user ID. Retry reapplies the selected profile and contact settings; it does not create a Jellyfin account, consume an invitation again, replay creation events, or send another welcome email. Integration setup can use the password already entered in the dialog, which is never stored for retries.
+
+After closing the dialog, find the existing account in Accounts and use **Apply settings** to reapply the selected profile. Integrations that have not imported the account need their own import or synchronization flow before applying their template. The admin API also supports `POST /users/{id}/setup` with the original account details and selected profile; it always reads that existing Jellyfin account first. A failed setup is not permission to submit the signup form again.
+
 ## Restoring a database backup
 
 In Settings, open Backups to select a server backup or upload a `.bak` file. Uploads must fit within the 100 MB request limit. Omnifin checks that the archive can be decoded before accepting a restore, and the page shows Restarting only after that acceptance. A rejected restore leaves the backup dialog open with an error so you can choose another file.
