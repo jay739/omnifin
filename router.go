@@ -371,11 +371,10 @@ func (app *appContext) loadRoutes(router *gin.Engine) {
 
 // Health reports liveness for process-level checks.
 func (app *appContext) Health(gc *gin.Context) {
-	gc.JSON(http.StatusOK, gin.H{
-		"status":  "ok",
-		"version": app.version,
-		"commit":  commit,
-	})
+	gc.JSON(http.StatusOK, struct {
+		Status string `json:"status"`
+		buildInformation
+	}{Status: "ok", buildInformation: currentBuildInformation()})
 }
 
 // Ready reports whether core dependencies are initialized.

@@ -175,6 +175,11 @@ After closing the dialog, find the existing account in Accounts and use **Apply 
 The web client renews an expired access token once through the appropriate administrator or My Account refresh endpoint. Concurrent requests share one renewal. The page and unsaved form fields stay in place, and successful background renewal does not start another set of polling timers.
 
 Requests are retried only after a 401 bearing the server middleware's `AUTHENTICATION_REQUIRED` marker, which is emitted before an API handler runs. Connection failures, timeouts, and ordinary application errors do not replay writes. If renewal is rejected, the login form opens once and protected polling stops until sign-in succeeds. Temporary renewal failures keep the saved refresh credential; **Retry saved session** can recover without entering credentials again.
+## Identifying a running build
+
+`GET /health` and `omnifin -version` report the release version, full source revision, build mode, build time, and updater mode. The CLI command exits without reading the application configuration or starting services. Development builds without source metadata identify themselves as development/unknown.
+
+Container builds receive version, revision, and timestamp arguments explicitly because the Docker context excludes `.git`. OCI image labels carry matching values. The release workflow runs the image's version command and checks those labels before publishing, then attaches the source-to-image digest mapping to the GitHub release. For a local image build, pass `VERSION`, `REVISION`, `BUILD_TIME` (Unix seconds), and `BUILD_DATE` (UTC RFC3339) as Docker build arguments.
 
 ## Restoring a database backup
 
